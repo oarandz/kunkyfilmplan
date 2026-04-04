@@ -1,0 +1,1967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Provisional Kunky Film Plan • 4 Apr–10 Apr 2026</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f8fbff;
+      --line: #d7e0ea;
+      --line-strong: #b9c7d6;
+      --text: #152235;
+      --muted: #607086;
+      --brand: #1f4d7a;
+      --brand-soft: #eaf2fb;
+      --watch-soft: #e9f7ef;
+      --block-soft: #fff4df;
+      --kids-soft: #f7ecff;
+      --shadow: 0 10px 24px rgba(18, 34, 53, 0.08);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --max: 1120px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 280px);
+      color: var(--text);
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 12px;
+    }
+
+    .hero {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--brand);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.1rem, 3.7vw, 2rem);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.3;
+    }
+
+    .status-pill {
+      white-space: nowrap;
+      align-self: start;
+      background: var(--brand-soft);
+      color: var(--brand);
+      border: 1px solid #cdddee;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+
+    .ten-day-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 0 0 8px;
+    }
+
+    .ten-day-header h2 {
+      margin: 0;
+      color: var(--brand);
+      font-size: 0.92rem;
+      line-height: 1.1;
+    }
+
+    .ten-day-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .ten-day-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .day-card {
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      border-radius: 12px;
+      padding: 7px;
+      min-height: 98px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      overflow: hidden;
+    }
+
+    .day-card.watch { background: var(--watch-soft); border-color: #cde9d7; }
+    .day-card.blocked { background: var(--block-soft); border-color: #ecd9a7; }
+
+    .day-top {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    .day-name {
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0.01em;
+    }
+
+    .day-date {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.62rem;
+      color: var(--muted);
+      font-weight: 600;
+      line-height: 1.05;
+    }
+
+    .card-badge {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--brand);
+      font-size: 0.58rem;
+      font-weight: 800;
+      padding: 3px 5px;
+      line-height: 1;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .day-body {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 0;
+    }
+
+    .mini-item {
+      border-top: 1px solid rgba(31, 77, 122, 0.12);
+      padding-top: 4px;
+    }
+
+    .mini-item:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .mini-film {
+      font-size: 0.63rem;
+      font-weight: 700;
+      line-height: 1.15;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .mini-time, .mini-note {
+      margin-top: 1px;
+      font-size: 0.58rem;
+      color: var(--muted);
+      line-height: 1.12;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .metric {
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    .metric-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      line-height: 1.15;
+    }
+
+    .metric-value {
+      margin-top: 3px;
+      font-size: 0.96rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      margin: 10px 0;
+      padding: 8px 0 4px;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(180deg, rgba(244,247,251,0.96) 65%, rgba(244,247,251,0));
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.92);
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      box-shadow: 0 4px 10px rgba(18,34,53,0.04);
+    }
+
+    .section {
+      margin-top: 10px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+    }
+
+    .section h2 {
+      margin: 0 0 10px;
+      color: var(--brand);
+      font-size: 1rem;
+      line-height: 1.15;
+    }
+
+    .section-intro {
+      margin: -2px 0 10px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+    }
+
+    .bullet-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .bullet-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel-soft);
+      padding: 10px;
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+
+    .table th, .table td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.35;
+    }
+
+    .table th {
+      background: #eef4fb;
+      color: var(--brand);
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .table tr.highlight td {
+      background: #f2faf5;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 0.67rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.kids { background: var(--kids-soft); }
+    .tag.watch { background: var(--watch-soft); }
+    .tag.blocked { background: var(--block-soft); }
+
+    .day-accordion {
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .day-accordion summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 800;
+      color: var(--brand);
+    }
+
+    .day-accordion summary::-webkit-details-marker { display: none; }
+
+    .day-summary-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .day-listings {
+      padding: 0 12px 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .listing {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .listing-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .listing-title {
+      font-size: 0.92rem;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .screening-chip {
+      display: inline-flex;
+      border: 1px solid var(--line);
+      background: var(--panel-soft);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 0.68rem;
+      line-height: 1.2;
+    }
+
+    .screening-chip.planned {
+      background: var(--watch-soft);
+      border-color: #cde9d7;
+      font-weight: 800;
+    }
+
+    .footer {
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 10px 28px;
+      font-size: 0.78rem;
+    }
+
+    @media (max-width: 820px) {
+      .table, .table thead, .table tbody, .table tr, .table th, .table td {
+        display: block;
+        width: 100%;
+      }
+
+      .table thead {
+        display: none;
+      }
+
+      .table tr {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel-soft);
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+
+      .table td {
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        padding: 8px 10px 8px 42%;
+        min-height: 38px;
+        position: relative;
+        background: transparent;
+      }
+
+      .table td:last-child {
+        border-bottom: 0;
+      }
+
+      .table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        top: 8px;
+        width: calc(42% - 16px);
+        color: var(--brand);
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1.25;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        padding: 8px;
+      }
+
+      .hero, .section {
+        padding: 10px;
+        border-radius: 16px;
+      }
+
+      .hero-top {
+        margin-bottom: 8px;
+      }
+
+      .subtitle {
+        font-size: 0.78rem;
+      }
+
+      .status-pill {
+        padding: 6px 8px;
+        font-size: 0.68rem;
+      }
+
+      .day-card {
+        min-height: 92px;
+        padding: 6px;
+        border-radius: 10px;
+      }
+
+      .day-name {
+        font-size: 0.68rem;
+      }
+
+      .day-date {
+        font-size: 0.58rem;
+      }
+
+      .mini-film {
+        font-size: 0.6rem;
+      }
+
+      .mini-time, .mini-note {
+        font-size: 0.56rem;
+      }
+
+      .metric {
+        padding: 7px;
+      }
+
+      .metric-value {
+        font-size: 0.9rem;
+      }
+
+      .nav-links a {
+        font-size: 0.71rem;
+        padding: 7px 9px;
+      }
+
+      .section h2 {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (min-width: 821px) {
+      .metric-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .day-listings {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .shell {
+        max-width: none;
+        padding: 0;
+      }
+
+      .nav {
+        display: none;
+      }
+
+      .hero, .section {
+        box-shadow: none;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero" id="top">
+      <div class="hero-top">
+        <div>
+          <p class="eyebrow">Cinema plan</p>
+          <h1 id="page-title"></h1>
+          <p class="subtitle" id="page-subtitle"></p>
+        </div>
+        <div class="status-pill" id="page-status"></div>
+      </div>
+
+      <div class="ten-day-header">
+        <h2>Next 10 days</h2>
+        <p>Two-row mobile view</p>
+      </div>
+      <div class="ten-day-grid" id="ten-day-grid"></div>
+
+      <div class="metric-grid" id="metric-grid"></div>
+    </header>
+
+    <nav class="nav" aria-label="Quick links">
+      <div class="nav-links">
+        <a href="#tldr">TL;DR</a>
+        <a href="#week-plan">Week plan</a>
+        <a href="#changes">Changes</a>
+        <a href="#impossible">Impossible</a>
+        <a href="#kids">Kids</a>
+        <a href="#future">Future</a>
+        <a href="#blackouts">Blackouts</a>
+        <a href="#daily-grid">Daily grid</a>
+      </div>
+    </nav>
+
+    <section class="section" id="tldr">
+      <h2>TL;DR</h2>
+      <div class="bullet-list" id="tldr-list"></div>
+    </section>
+
+    <section class="section" id="week-plan">
+      <h2>Upcoming week watch plan</h2>
+      <p class="section-intro" id="week-plan-note"></p>
+      <div id="week-plan-table"></div>
+    </section>
+
+    <section class="section" id="changes">
+      <h2>Key changes versus the previous issue</h2>
+      <div id="changes-table"></div>
+    </section>
+
+    <section class="section" id="assumptions">
+      <h2>Plan assumptions</h2>
+      <div id="assumptions-table"></div>
+    </section>
+
+    <section class="section" id="impossible">
+      <h2>Titles currently impossible under the stated rules</h2>
+      <div id="impossible-table"></div>
+    </section>
+
+    <section class="section" id="kids">
+      <h2>Children’s films currently listed</h2>
+      <div id="kids-table"></div>
+    </section>
+
+    <section class="section" id="future">
+      <h2>Other film schedule beyond the next week</h2>
+      <div id="future-table"></div>
+    </section>
+
+    <section class="section" id="blackouts">
+      <h2>Brick Community Stadium home-match blackout dates applied</h2>
+      <div id="blackouts-table"></div>
+    </section>
+
+    <section class="section" id="daily-grid">
+      <h2>Seven-day grid of all listed screenings</h2>
+      <p class="section-intro">Planned screenings are highlighted within each day.</p>
+      <div id="daily-grid-list"></div>
+    </section>
+
+    <div class="footer" id="footer-note"></div>
+  </div>
+
+  <script id="plan-data" type="application/json">
+{
+  "meta": {
+    "title": "Provisional Kunky Film Plan",
+    "subtitle": "Provisional Kunky Film Plan for period 04 April 2026 to 10 April 2026",
+    "statusNote": "Priority file applied • corrected issue",
+    "reportWindow": "4 Apr–10 Apr 2026",
+    "plannedThisWeek": "2 watches / 3h 20m",
+    "feasibleNonKidsAssigned": "11 / 11",
+    "impossibleNonKids": 9,
+    "kidsTitlesListed": 5
+  },
+  "tldr": [
+    "With Priority.txt applied, The Drama is restored to Wednesday 8 April at 19:40 exactly as requested, Super Mario becomes a scheduled priority exception, and Hoppers is now explicitly excluded.",
+    "The core completion plan still covers every feasible non-kids title: 11 of 11 are scheduled, while 9 other non-kids remain impossible under the current cutoffs, X-days and Brick Community Stadium blackout dates.",
+    "The tightest forced run is still 12–20 April: Musik, California Schemin’, Undertone, BTS Japan, Akira and The Mummy. Michael now moves to Sun 26 Apr because Sat 25 Apr is blocked by the AFC Wimbledon home fixture."
+  ],
+  "nextSevenDays": [
+    {
+      "day": "Sat 4 Apr 2026",
+      "primary": "No watch",
+      "time": "",
+      "note": "X-block day",
+      "watch": false
+    },
+    {
+      "day": "Sun 5 Apr 2026",
+      "primary": "The Super Mario Galaxy Movie",
+      "time": "16:40–18:15",
+      "note": "Priority kids exception • MAXX",
+      "watch": true
+    },
+    {
+      "day": "Mon 6 Apr 2026",
+      "primary": "No watch",
+      "time": "",
+      "note": "",
+      "watch": false
+    },
+    {
+      "day": "Tue 7 Apr 2026",
+      "primary": "No watch",
+      "time": "",
+      "note": "X-block day",
+      "watch": false
+    },
+    {
+      "day": "Wed 8 Apr 2026",
+      "primary": "The Drama",
+      "time": "19:40–21:25",
+      "note": "Fixed with Lucy",
+      "watch": true
+    },
+    {
+      "day": "Thu 9 Apr 2026",
+      "primary": "No watch",
+      "time": "",
+      "note": "X-block day",
+      "watch": false
+    },
+    {
+      "day": "Fri 10 Apr 2026",
+      "primary": "No watch",
+      "time": "",
+      "note": "X-block day",
+      "watch": false
+    }
+  ],
+  "assumptions": [
+    {
+      "item": "Priority file applied",
+      "detail": "The missing Priority.txt is now in play, so this issue restores the protected The Drama slot, promotes Super Mario as a priority exception, records Stop! That! Train! for the next JSON update, and keeps Hoppers out."
+    },
+    {
+      "item": "Availability blocks used",
+      "detail": "Any day with an X for Owen, Conor or Alice was treated as fully unavailable: Sat 4 Apr, Tue 7 Apr, Wed 8 Apr, Thu 9 Apr, Fri 10 Apr and Fri 17 Apr. The only override is The Drama, which the priority file explicitly fixes to Wed 8 Apr."
+    },
+    {
+      "item": "Spreadsheet notes",
+      "detail": "Free-text notes such as “Off work so films after 5pm possible” were not used to relax the hard cinema cutoffs of weekdays from 19:35, Saturdays from 12:00 and Sundays from 13:30."
+    },
+    {
+      "item": "Brick Community Stadium blackouts",
+      "detail": "Home-match blackout dates applied here are Sat 11 Apr, Tue 14 Apr, Sun 19 Apr, Sat 25 Apr, Sat 2 May and Fri 15 May."
+    },
+    {
+      "item": "MAXX preference",
+      "detail": "MAXX was treated as the IMAX-style premium preference and used where it did not break the completion plan."
+    },
+    {
+      "item": "Future priority memory",
+      "detail": "Stop! That! Train! is not yet in the current Omniplex JSON, so it cannot be dated here, but it should jump the queue when it appears."
+    }
+  ],
+  "changes": [
+    {
+      "item": "Priority handling",
+      "previous": "The previous issue had to fall back to a strict non-kids plan because the priority file was missing.",
+      "current": "This issue applies the priority file in full: The Drama is protected, Super Mario is added, Stop! That! Train! is parked as a future priority, and Hoppers stays out.",
+      "reason": "The missing input has now been supplied."
+    },
+    {
+      "item": "The Drama",
+      "previous": "Sun 5 Apr 2026 19:40–21:25 • Screen 9",
+      "current": "Wed 8 Apr 2026 19:40–21:25 • Screen 9",
+      "reason": "The priority file explicitly says this must stay on 8 April at 19:40 as planned with Lucy."
+    },
+    {
+      "item": "The Super Mario Galaxy Movie",
+      "previous": "Left out of the plan because it was treated as an unscheduled kids title without a priority override.",
+      "current": "Sun 5 Apr 2026 16:40–18:15 • MAXX",
+      "reason": "The priority file says it is wanted, so it is now carried as a deliberate kids-film exception."
+    },
+    {
+      "item": "Michael",
+      "previous": "Sat 25 Apr 2026 16:00–18:07 • MAXX",
+      "current": "Sun 26 Apr 2026 16:00–18:07 • MAXX",
+      "reason": "Sat 25 Apr is a Brick Community Stadium football blackout because AFC Wimbledon are at home."
+    },
+    {
+      "item": "Hoppers",
+      "previous": "Already out of the non-kids completion plan, but only by inference.",
+      "current": "Still unscheduled, now with an explicit do-not-schedule instruction in the priority file.",
+      "reason": "The user note settles the classification directly."
+    }
+  ],
+  "upcomingWeekPlan": [
+    {
+      "date": "Sun 5 Apr 2026",
+      "film": "The Super Mario Galaxy Movie",
+      "time": "16:40–18:15",
+      "screen": "MAXX",
+      "duration": "1h 35m",
+      "notes": "Priority kids exception: brought into the immediate week in MAXX because the priority file says it is wanted."
+    },
+    {
+      "date": "Wed 8 Apr 2026",
+      "film": "The Drama",
+      "time": "19:40–21:25",
+      "screen": "Screen 9",
+      "duration": "1h 45m",
+      "notes": "Protected priority slot: kept exactly on Wednesday 8 April at 19:40 as planned with Lucy."
+    }
+  ],
+  "upcomingWeekTotalNote": "Two watches now sit inside the report window: the Super Mario priority exception on Sunday, then the protected The Drama booking on Wednesday.",
+  "blackouts": [
+    {
+      "date": "Sat 11 Apr 2026",
+      "fixture": "Wigan Athletic v Mansfield Town"
+    },
+    {
+      "date": "Tue 14 Apr 2026",
+      "fixture": "Wigan Athletic v Rotherham United"
+    },
+    {
+      "date": "Sun 19 Apr 2026",
+      "fixture": "Wigan Warriors v Castleford Tigers"
+    },
+    {
+      "date": "Sat 25 Apr 2026",
+      "fixture": "Wigan Athletic v AFC Wimbledon"
+    },
+    {
+      "date": "Sat 2 May 2026",
+      "fixture": "Wigan Warriors v Bradford Bulls"
+    },
+    {
+      "date": "Fri 15 May 2026",
+      "fixture": "Wigan Warriors v Leeds Rhinos"
+    }
+  ],
+  "impossibleTitles": [
+    {
+      "film": "BTS World Tour - Arirang in Goyang: Live Viewing",
+      "why": "Both listed screenings land on Sat 11 Apr, which is a Brick Community Stadium home-match blackout day.",
+      "change": "Only listed on Sat 11 Apr 2026."
+    },
+    {
+      "film": "Challenge Cup Quater-Final: Wakefield Trinity v Wigan Warriors",
+      "why": "Its only listing starts at 13:00 on a Sunday, which misses the 13:30 Sunday cutoff.",
+      "change": "Only listed on Sun 12 Apr 2026."
+    },
+    {
+      "film": "Eugene Onegin - Met Opera (2026)",
+      "why": "The only showing starts at 18:45 on a weekday, before the 19:35 weekday cutoff.",
+      "change": "Only listed on Tue 5 May 2026."
+    },
+    {
+      "film": "Funny Girl: The Musical",
+      "why": "The only showing starts at 19:00 on a weekday, before the 19:35 weekday cutoff.",
+      "change": "Only listed on Thu 30 Apr 2026."
+    },
+    {
+      "film": "Les Liaisons Dangereuses - National Theatre",
+      "why": "The only showing starts at 19:00 on a weekday, before the 19:35 weekday cutoff.",
+      "change": "Only listed on Thu 25 Jun 2026."
+    },
+    {
+      "film": "Midwinter Break",
+      "why": "It is a daytime-only showing on an X-blocked Wednesday.",
+      "change": "Only listed on Wed 8 Apr 2026 at 12:00."
+    },
+    {
+      "film": "Paul Smith: Pablo Live",
+      "why": "The only showing starts before the weekday cutoff and also lands on Conor’s X-blocked Friday.",
+      "change": "Only listed on Fri 17 Apr 2026 at 18:30."
+    },
+    {
+      "film": "The Magic Flute - From The Royal Ballet (2026)",
+      "why": "The only showing starts at 18:45 on a weekday, before the 19:35 weekday cutoff.",
+      "change": "Only listed on Tue 21 Apr 2026."
+    },
+    {
+      "film": "You, Me & Tuscany",
+      "why": "Its lone compliant-looking starts either fall on the Fri 10 Apr X-block or the Sat 11 Apr football blackout; every later weekday start is only 19:20.",
+      "change": "Latest run ends Thu 16 Apr 2026."
+    }
+  ],
+  "kidsTitles": [
+    {
+      "title": "Bluey At the Cinemas: Playdates with Friends",
+      "window": "5 Apr to 11 Apr 2026",
+      "times": "Sun 5 Apr 10:30; Mon 6 Apr 10:00; Mon 6 Apr 10:30; Mon 6 Apr 11:00; Tue 7 Apr 11:10; Wed 8 Apr 11:10",
+      "comment": "Not added. Every listed screening is before the weekend or weekday cutoff."
+    },
+    {
+      "title": "Hoppers",
+      "window": "4 Apr to 11 Apr 2026",
+      "times": "Sat 4 Apr 12:20; Sat 4 Apr 15:10; Sun 5 Apr 10:20; Sun 5 Apr 12:50; Sun 5 Apr 15:30; Mon 6 Apr 10:20",
+      "comment": "Explicitly excluded: the priority file says this is a kids film and should not be scheduled."
+    },
+    {
+      "title": "The Magic Faraway Tree",
+      "window": "4 Apr to 16 Apr 2026",
+      "times": "Sat 4 Apr 11:50; Sat 4 Apr 13:10; Sat 4 Apr 14:30; Sat 4 Apr 15:50; Sat 4 Apr 17:00; Sat 4 Apr 18:20",
+      "comment": "Not added. It stays outside the non-kids completion plan."
+    },
+    {
+      "title": "The SpongeBob Movie: Search for SquarePants",
+      "window": "5 Apr to 6 Apr 2026",
+      "times": "Sun 5 Apr 10:00; Mon 6 Apr 10:00",
+      "comment": "Not added. The run stays in daytime territory and never reaches a compliant slot."
+    },
+    {
+      "title": "The Super Mario Galaxy Movie",
+      "window": "4 Apr to 16 Apr 2026",
+      "times": "Sat 4 Apr 11:30; Sat 4 Apr 12:00; Sat 4 Apr 12:30; Sat 4 Apr 13:00; Sat 4 Apr 13:20; Sat 4 Apr 13:50",
+      "comment": "Priority exception: scheduled on Sun 5 Apr 2026 at 16:40–18:15 in MAXX because the priority file says it is wanted."
+    }
+  ],
+  "futureSchedule": [
+    {
+      "film": "Musik",
+      "status": "Planned",
+      "chosen": "Sun 12 Apr 2026 14:00–15:14",
+      "screen": "Screen 7",
+      "notes": "Only compliant listing, so it stays locked."
+    },
+    {
+      "film": "California Schemin'",
+      "status": "Planned",
+      "chosen": "Mon 13 Apr 2026 20:10–21:57",
+      "screen": "Screen 4",
+      "notes": "Earliest clean weekday slot after the blackout weekend."
+    },
+    {
+      "film": "Undertone",
+      "status": "Planned",
+      "chosen": "Wed 15 Apr 2026 20:30–22:04",
+      "screen": "Screen 8",
+      "notes": "Separated from California Schemin’ and kept before the title leaves on 16 Apr."
+    },
+    {
+      "film": "BTS World Tour - Arirang in Japan: Live Viewing",
+      "status": "Planned",
+      "chosen": "Sat 18 Apr 2026 14:30–17:30",
+      "screen": "Screen 9",
+      "notes": "Only compliant showing."
+    },
+    {
+      "film": "Akira (Re Release) (Subtitled)",
+      "status": "Planned",
+      "chosen": "Sat 18 Apr 2026 19:10–21:15",
+      "screen": "Screen 4",
+      "notes": "Best paired after BTS Japan on the same Saturday."
+    },
+    {
+      "film": "Lee Cronin's The Mummy",
+      "status": "Planned",
+      "chosen": "Mon 20 Apr 2026 20:00–22:12",
+      "screen": "Screen 2",
+      "notes": "20 Apr is the first workable slot that keeps BTS Japan and Akira alive, even though that means giving up MAXX."
+    },
+    {
+      "film": "Michael",
+      "status": "Planned",
+      "chosen": "Sun 26 Apr 2026 16:00–18:07",
+      "screen": "MAXX",
+      "notes": "Moved from 25 Apr to the first clean MAXX slot after the AFC Wimbledon home-match blackout."
+    },
+    {
+      "film": "The Devil Wears Prada 2",
+      "status": "Planned",
+      "chosen": "Sun 3 May 2026 16:10–18:10",
+      "screen": "MAXX",
+      "notes": "Earliest clean MAXX slot after the 2 May rugby blackout."
+    },
+    {
+      "film": "Iron Maiden: Burning Ambition",
+      "status": "Planned",
+      "chosen": "Sat 9 May 2026 19:10–20:56",
+      "screen": "Screen 5",
+      "notes": "Earliest compliant showing."
+    },
+    {
+      "film": "The Playboy of the Western World - National Theatre",
+      "status": "Planned",
+      "chosen": "Sun 31 May 2026 14:00–16:30",
+      "screen": "Screen 9",
+      "notes": "Sunday repeat is the only compliant showing."
+    }
+  ],
+  "dailyGrid": [
+    {
+      "dateLabel": "Saturday 4 April 2026",
+      "anchor": "sat-4-apr-2026",
+      "entries": [
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "12:20–14:05 (Screen 4)",
+            "15:10–16:55 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:40–14:25 (Screen 9)",
+            "15:00–16:45 (Screen 9)",
+            "17:40–19:25 (Screen 9)",
+            "20:10–21:55 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:50–13:40 (Screen 7)",
+            "13:10–15:00 (Screen 6)",
+            "14:30–16:20 (Screen 7)",
+            "15:50–17:40 (Screen 6)",
+            "17:00–18:50 (Screen 7)",
+            "18:20–20:10 (Screen 6)",
+            "19:40–21:30 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    },
+    {
+      "dateLabel": "Sunday 5 April 2026",
+      "anchor": "sun-5-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "10:30–11:30 (Screen 8)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "10:20–12:05 (Screen 5)",
+            "12:50–14:35 (Screen 4)",
+            "15:30–17:15 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:10–13:55 (Screen 9)",
+            "14:30–16:15 (Screen 9)",
+            "17:00–18:45 (Screen 9)",
+            "19:40–21:25 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "10:15–12:05 (Screen 4)",
+            "11:20–13:10 (Screen 7)",
+            "12:10–14:00 (Screen 6)",
+            "14:00–15:50 (Screen 7)",
+            "14:50–16:40 (Screen 6)",
+            "16:30–18:20 (Screen 7)",
+            "17:30–19:20 (Screen 6)",
+            "19:10–21:00 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The SpongeBob Movie: Search for SquarePants",
+          "kids": true,
+          "screenings": [
+            "10:00–11:30 (Screen 6)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "10:10–11:45 (Screen 11)",
+            "10:40–12:15 (Screen 2)",
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)",
+            "20:40–22:15 (Screen 3)"
+          ],
+          "plannedIndices": [
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "dateLabel": "Monday 6 April 2026",
+      "anchor": "mon-6-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "10:00–11:00 (Screen 9)",
+            "10:30–11:30 (Screen 8)",
+            "11:00–12:00 (Screen 5)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "10:20–12:05 (Screen 4)",
+            "12:50–14:35 (Screen 4)",
+            "15:30–17:15 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:10–13:55 (Screen 9)",
+            "14:30–16:15 (Screen 9)",
+            "17:10–18:55 (Screen 9)",
+            "19:40–21:25 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:20–13:10 (Screen 7)",
+            "12:20–14:10 (Screen 6)",
+            "14:00–15:50 (Screen 7)",
+            "15:00–16:50 (Screen 6)",
+            "16:30–18:20 (Screen 7)",
+            "17:30–19:20 (Screen 6)",
+            "19:10–21:00 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The SpongeBob Movie: Search for SquarePants",
+          "kids": true,
+          "screenings": [
+            "10:00–11:30 (Screen 6)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "10:10–11:45 (Screen 11)",
+            "10:40–12:15 (Screen 2)",
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)",
+            "20:40–22:15 (Screen 3)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    },
+    {
+      "dateLabel": "Tuesday 7 April 2026",
+      "anchor": "tue-7-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "11:10–12:10 (Screen 2)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "12:50–14:35 (Screen 4)",
+            "15:30–17:15 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:10–13:55 (Screen 9)",
+            "14:30–16:15 (Screen 9)",
+            "17:00–18:45 (Screen 9)",
+            "19:40–21:25 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:20–13:10 (Screen 7)",
+            "12:20–14:10 (Screen 6)",
+            "14:00–15:50 (Screen 7)",
+            "15:00–16:50 (Screen 6)",
+            "16:30–18:20 (Screen 7)",
+            "17:30–19:20 (Screen 6)",
+            "19:10–21:00 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    },
+    {
+      "dateLabel": "Wednesday 8 April 2026",
+      "anchor": "wed-8-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "11:10–12:10 (Screen 2)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "12:50–14:35 (Screen 4)",
+            "15:30–17:15 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Midwinter Break",
+          "kids": false,
+          "screenings": [
+            "12:00–13:30 (Screen 5)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:10–13:55 (Screen 9)",
+            "14:30–16:15 (Screen 9)",
+            "17:00–18:45 (Screen 9)",
+            "19:40–21:25 (Screen 9)"
+          ],
+          "plannedIndices": [
+            3
+          ]
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:20–13:10 (Screen 7)",
+            "12:20–14:10 (Screen 6)",
+            "14:00–15:50 (Screen 7)",
+            "15:00–16:50 (Screen 6)",
+            "16:30–18:20 (Screen 7)",
+            "17:30–19:20 (Screen 6)",
+            "19:10–21:00 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    },
+    {
+      "dateLabel": "Thursday 9 April 2026",
+      "anchor": "thu-9-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "11:10–12:10 (Screen 2)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "12:50–14:35 (Screen 4)",
+            "15:30–17:15 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Musik",
+          "kids": false,
+          "screenings": [
+            "18:00–19:14 (Screen 10)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "12:10–13:55 (Screen 9)",
+            "14:30–16:15 (Screen 9)",
+            "17:00–18:45 (Screen 9)",
+            "19:40–21:25 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:20–13:10 (Screen 7)",
+            "12:20–14:10 (Screen 6)",
+            "14:00–15:50 (Screen 7)",
+            "15:00–16:50 (Screen 6)",
+            "16:30–18:20 (Screen 7)",
+            "17:30–19:20 (Screen 6)",
+            "19:10–21:00 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:30–20:05 (Screen 3)",
+            "19:00–20:35 (MAXX)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    },
+    {
+      "dateLabel": "Friday 10 April 2026",
+      "anchor": "fri-10-apr-2026",
+      "entries": [
+        {
+          "title": "Bluey At the Cinemas: Playdates with Friends",
+          "kids": true,
+          "screenings": [
+            "11:20–12:20 (Screen 6)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "California Schemin'",
+          "kids": false,
+          "screenings": [
+            "12:50–14:37 (Screen 4)",
+            "15:30–17:17 (Screen 4)",
+            "18:10–19:57 (Screen 4)",
+            "20:40–22:27 (Screen 4)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Hoppers",
+          "kids": true,
+          "screenings": [
+            "11:10–12:55 (Screen 8)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Drama",
+          "kids": false,
+          "screenings": [
+            "17:50–19:35 (Screen 7)",
+            "20:10–21:55 (Screen 7)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Magic Faraway Tree",
+          "kids": true,
+          "screenings": [
+            "11:50–13:40 (Screen 9)",
+            "12:20–14:10 (Screen 7)",
+            "14:30–16:20 (Screen 9)",
+            "15:10–17:00 (Screen 7)",
+            "17:00–18:50 (Screen 9)",
+            "19:40–21:30 (Screen 9)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "The Super Mario Galaxy Movie",
+          "kids": true,
+          "screenings": [
+            "11:00–12:35 (Screen 10)",
+            "11:30–13:05 (Screen 3)",
+            "12:00–13:35 (MAXX)",
+            "12:30–14:05 (Screen 11)",
+            "13:00–14:35 (Screen 2)",
+            "13:20–14:55 (Screen 10)",
+            "13:50–15:25 (Screen 3)",
+            "14:20–15:55 (MAXX)",
+            "14:50–16:25 (Screen 11)",
+            "15:20–16:55 (Screen 2)",
+            "15:40–17:15 (Screen 10)",
+            "16:10–17:45 (Screen 3)",
+            "16:40–18:15 (MAXX)",
+            "17:10–18:45 (Screen 11)",
+            "17:40–19:15 (Screen 2)",
+            "18:00–19:35 (Screen 10)",
+            "18:30–20:05 (Screen 3)",
+            "19:30–21:05 (Screen 11)",
+            "20:00–21:35 (Screen 2)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "Undertone",
+          "kids": false,
+          "screenings": [
+            "14:00–15:34 (Screen 8)",
+            "16:30–18:04 (Screen 8)",
+            "18:50–20:24 (Screen 8)",
+            "21:00–22:34 (Screen 8)"
+          ],
+          "plannedIndices": []
+        },
+        {
+          "title": "You, Me & Tuscany",
+          "kids": false,
+          "screenings": [
+            "12:40–14:25 (Screen 5)",
+            "15:00–16:45 (Screen 5)",
+            "17:20–19:05 (Screen 5)",
+            "19:50–21:35 (Screen 5)"
+          ],
+          "plannedIndices": []
+        }
+      ]
+    }
+  ]
+}
+  </script>
+
+  <script>
+    const planData = JSON.parse(document.getElementById('plan-data').textContent);
+
+    const monthMap = {
+      jan: 0, january: 0,
+      feb: 1, february: 1,
+      mar: 2, march: 2,
+      apr: 3, april: 3,
+      may: 4,
+      jun: 5, june: 5,
+      jul: 6, july: 6,
+      aug: 7, august: 7,
+      sep: 8, sept: 8, september: 8,
+      oct: 9, october: 9,
+      nov: 10, november: 10,
+      dec: 11, december: 11
+    };
+
+    const shortMonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const shortDay = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    const escapeHtml = (value) => String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
+
+    const pad = (n) => String(n).padStart(2, '0');
+
+    function parseDateLoose(value, fallbackYear = null) {
+      if (!value) return null;
+      const yearFromMeta = (planData.meta.subtitle.match(/(20\d{2})/) || [])[1];
+      const useYear = fallbackYear || (yearFromMeta ? Number(yearFromMeta) : new Date().getFullYear());
+      let match = value.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)?\s*(\d{1,2})\s+([A-Za-z]+)\s+(20\d{2})/i);
+      if (match) {
+        const month = monthMap[match[2].toLowerCase()];
+        if (month == null) return null;
+        return new Date(Number(match[3]), month, Number(match[1]));
+      }
+      match = value.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+(\d{1,2})\s+([A-Za-z]+)/i);
+      if (match) {
+        const month = monthMap[match[2].toLowerCase()];
+        if (month == null) return null;
+        return new Date(useYear, month, Number(match[1]));
+      }
+      match = value.match(/\b(\d{1,2})\s+([A-Za-z]+)\b/i);
+      if (match) {
+        const month = monthMap[match[2].toLowerCase()];
+        if (month == null) return null;
+        return new Date(useYear, month, Number(match[1]));
+      }
+      return null;
+    }
+
+    function isoDate(date) {
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    }
+
+    function labelShort(date) {
+      return `${shortDay[date.getDay()]}`;
+    }
+
+    function labelDate(date) {
+      return `${date.getDate()} ${shortMonth[date.getMonth()]}`;
+    }
+
+    function addDays(date, days) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      return d;
+    }
+
+    function extractXBlockDates() {
+      const availability = (planData.assumptions || []).find(item => /Availability blocks used/i.test(item.item));
+      if (!availability) return new Set();
+      const matches = availability.detail.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+\d{1,2}\s+[A-Za-z]+/g) || [];
+      const set = new Set();
+      matches.forEach(token => {
+        const parsed = parseDateLoose(token);
+        if (parsed) set.add(isoDate(parsed));
+      });
+      return set;
+    }
+
+    function renderTable(columns, rows, options = {}) {
+      const rowClass = options.rowClass || (() => '');
+      const introEmpty = options.emptyText || 'No items listed.';
+      if (!rows || !rows.length) return `<p class="section-intro">${escapeHtml(introEmpty)}</p>`;
+      return `
+        <table class="table">
+          <thead>
+            <tr>${columns.map(col => `<th>${escapeHtml(col.label)}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${
+              rows.map((row, rowIndex) => `
+                <tr class="${rowClass(row, rowIndex)}">
+                  ${
+                    columns.map(col => `
+                      <td data-label="${escapeHtml(col.label)}">
+                        ${col.render ? col.render(row, rowIndex) : escapeHtml(row[col.key] ?? '')}
+                      </td>
+                    `).join('')
+                  }
+                </tr>
+              `).join('')
+            }
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderMetrics() {
+      const metrics = [
+        ['Report window', planData.meta.reportWindow],
+        ['Planned this week', planData.meta.plannedThisWeek],
+        ['Feasible non-kids assigned', planData.meta.feasibleNonKidsAssigned],
+        ['Impossible non-kids', String(planData.meta.impossibleNonKids)],
+        ['Kids titles listed', String(planData.meta.kidsTitlesListed)],
+      ];
+      document.getElementById('metric-grid').innerHTML = metrics.map(([label, value]) => `
+        <div class="metric">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div class="metric-value">${escapeHtml(value)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderTenDayGrid() {
+      const startDate = parseDateLoose(
+        (planData.dailyGrid && planData.dailyGrid[0] && planData.dailyGrid[0].dateLabel) ||
+        (planData.nextSevenDays && planData.nextSevenDays[0] && planData.nextSevenDays[0].day) ||
+        planData.meta.subtitle
+      ) || new Date();
+
+      const nextSevenMap = new Map();
+      (planData.nextSevenDays || []).forEach(item => {
+        const parsed = parseDateLoose(item.day);
+        if (parsed) nextSevenMap.set(isoDate(parsed), item);
+      });
+
+      const futureMap = new Map();
+      (planData.futureSchedule || []).forEach(item => {
+        const parsed = parseDateLoose(item.chosen);
+        if (!parsed) return;
+        const key = isoDate(parsed);
+        const arr = futureMap.get(key) || [];
+        arr.push(item);
+        futureMap.set(key, arr);
+      });
+
+      const blackoutMap = new Map();
+      (planData.blackouts || []).forEach(item => {
+        const parsed = parseDateLoose(item.date);
+        if (parsed) blackoutMap.set(isoDate(parsed), item.fixture);
+      });
+
+      const xBlockDates = extractXBlockDates();
+
+      const cards = [];
+      for (let i = 0; i < 10; i += 1) {
+        const date = addDays(startDate, i);
+        const key = isoDate(date);
+        const weekEntry = nextSevenMap.get(key);
+        const futureEntries = futureMap.get(key) || [];
+        let items = [];
+        let note = '';
+        let state = 'none';
+
+        if (weekEntry) {
+          if (weekEntry.watch && weekEntry.primary && weekEntry.primary !== 'No watch') {
+            items = [{ film: weekEntry.primary, time: weekEntry.time || '', extra: '' }];
+            state = 'watch';
+          }
+          if (weekEntry.note) note = weekEntry.note;
+        } else if (futureEntries.length) {
+          items = futureEntries.slice(0, 2).map(entry => {
+            const timeMatch = entry.chosen.match(/(\d{1,2}:\d{2}[–-]\d{1,2}:\d{2})/);
+            return {
+              film: entry.film,
+              time: timeMatch ? timeMatch[1] : '',
+              extra: entry.status || ''
+            };
+          });
+          state = 'watch';
+          if (futureEntries.length > 2) {
+            note = `${futureEntries.length} planned items`;
+          }
+        }
+
+        if (!items.length) {
+          if (blackoutMap.has(key)) {
+            note = `Home match`;
+            state = 'blocked';
+          } else if (xBlockDates.has(key)) {
+            note = `X-block day`;
+            state = 'blocked';
+          } else {
+            note = note || 'No watch';
+          }
+        }
+
+        const badge = state === 'watch' ? 'Watch' : state === 'blocked' ? 'Blocked' : 'Free';
+        cards.push(`
+          <div class="day-card ${state}">
+            <div class="day-top">
+              <div>
+                <div class="day-name">${escapeHtml(labelShort(date))}</div>
+                <span class="day-date">${escapeHtml(labelDate(date))}</span>
+              </div>
+              <span class="card-badge">${escapeHtml(badge)}</span>
+            </div>
+            <div class="day-body">
+              ${
+                items.length
+                  ? items.map(item => `
+                    <div class="mini-item">
+                      <div class="mini-film">${escapeHtml(item.film)}</div>
+                      <div class="mini-time">${escapeHtml([item.time, item.extra].filter(Boolean).join(' • '))}</div>
+                    </div>
+                  `).join('')
+                  : `<div class="mini-item"><div class="mini-film">${escapeHtml(note)}</div></div>`
+              }
+              ${
+                items.length && note
+                  ? `<div class="mini-note">${escapeHtml(note)}</div>`
+                  : ''
+              }
+            </div>
+          </div>
+        `);
+      }
+
+      document.getElementById('ten-day-grid').innerHTML = cards.join('');
+    }
+
+    function renderTLDR() {
+      document.getElementById('tldr-list').innerHTML = (planData.tldr || []).map(item => `
+        <div class="bullet-item">${escapeHtml(item)}</div>
+      `).join('');
+    }
+
+    function renderWeekPlan() {
+      document.getElementById('week-plan-note').textContent = planData.upcomingWeekTotalNote || '';
+      document.getElementById('week-plan-table').innerHTML = renderTable(
+        [
+          { label: 'Day / Date', key: 'date' },
+          { label: 'Film', key: 'film', render: row => `<strong>${escapeHtml(row.film)}</strong>` },
+          { label: 'Time', key: 'time' },
+          { label: 'Screen', key: 'screen' },
+          { label: 'Duration', key: 'duration' },
+          { label: 'Notes', key: 'notes' },
+        ],
+        planData.upcomingWeekPlan || [],
+        { rowClass: () => 'highlight' }
+      );
+    }
+
+    function renderChanges() {
+      document.getElementById('changes-table').innerHTML = renderTable(
+        [
+          { label: 'Item', key: 'item' },
+          { label: 'Previous issue', key: 'previous' },
+          { label: 'Current issue', key: 'current' },
+          { label: 'Reason / note', key: 'reason' },
+        ],
+        planData.changes || []
+      );
+    }
+
+    function renderAssumptions() {
+      document.getElementById('assumptions-table').innerHTML = renderTable(
+        [
+          { label: 'Item', key: 'item', render: row => `<strong>${escapeHtml(row.item)}</strong>` },
+          { label: 'Detail', key: 'detail' },
+        ],
+        planData.assumptions || []
+      );
+    }
+
+    function renderImpossible() {
+      document.getElementById('impossible-table').innerHTML = renderTable(
+        [
+          { label: 'Film', key: 'film', render: row => `<strong>${escapeHtml(row.film)}</strong>` },
+          { label: 'Why it is currently impossible', key: 'why' },
+          { label: 'Change note', key: 'change' },
+        ],
+        planData.impossibleTitles || []
+      );
+    }
+
+    function renderKids() {
+      document.getElementById('kids-table').innerHTML = renderTable(
+        [
+          { label: 'Title', key: 'title', render: row => `<strong>${escapeHtml(row.title)}</strong>` },
+          { label: 'Run window', key: 'window' },
+          { label: 'Example listed times', key: 'times' },
+          { label: 'Comment', key: 'comment' },
+        ],
+        planData.kidsTitles || []
+      );
+    }
+
+    function renderFuture() {
+      document.getElementById('future-table').innerHTML = renderTable(
+        [
+          { label: 'Film', key: 'film', render: row => `<strong>${escapeHtml(row.film)}</strong>` },
+          { label: 'Plan status', key: 'status' },
+          { label: 'Chosen screening', key: 'chosen' },
+          { label: 'Screen', key: 'screen' },
+          { label: 'Notes', key: 'notes' },
+        ],
+        planData.futureSchedule || []
+      );
+    }
+
+    function renderBlackouts() {
+      document.getElementById('blackouts-table').innerHTML = renderTable(
+        [
+          { label: 'Date', key: 'date' },
+          { label: 'Fixture', key: 'fixture' },
+        ],
+        planData.blackouts || []
+      );
+    }
+
+    function renderDailyGrid() {
+      const host = document.getElementById('daily-grid-list');
+      const daily = planData.dailyGrid || [];
+      host.innerHTML = daily.map((day, dayIndex) => {
+        const plannedCount = (day.entries || []).reduce((count, entry) => count + (entry.plannedIndices || []).length, 0);
+        const countLabel = `${(day.entries || []).length} listed`;
+        return `
+          <details class="day-accordion" ${dayIndex === 0 ? 'open' : ''}>
+            <summary>
+              <span>${escapeHtml(day.dateLabel)}</span>
+              <span class="day-summary-meta">
+                <span class="tag">${escapeHtml(countLabel)}</span>
+                ${plannedCount ? `<span class="tag watch">${plannedCount} planned</span>` : ''}
+              </span>
+            </summary>
+            <div class="day-listings">
+              ${
+                (!day.entries || !day.entries.length)
+                  ? `<div class="listing"><div class="listing-title">No current screenings listed.</div></div>`
+                  : day.entries.map(entry => `
+                    <article class="listing">
+                      <div class="listing-head">
+                        <div>
+                          <div class="listing-title">${escapeHtml(entry.title)}</div>
+                        </div>
+                        <div class="chip-row">
+                          <span class="tag ${entry.kids ? 'kids' : ''}">${entry.kids ? 'Kids' : 'Non-kids'}</span>
+                          ${(entry.plannedIndices || []).length ? '<span class="tag watch">Watching</span>' : ''}
+                        </div>
+                      </div>
+                      <div class="chip-row">
+                        ${
+                          (entry.screenings || []).map((screening, screeningIndex) => `
+                            <span class="screening-chip ${(entry.plannedIndices || []).includes(screeningIndex) ? 'planned' : ''}">
+                              ${(entry.plannedIndices || []).includes(screeningIndex) ? '★ ' : ''}${escapeHtml(screening)}
+                            </span>
+                          `).join('')
+                        }
+                      </div>
+                    </article>
+                  `).join('')
+              }
+            </div>
+          </details>
+        `;
+      }).join('');
+    }
+
+    function init() {
+      document.getElementById('page-title').textContent = planData.meta.title;
+      document.getElementById('page-subtitle').textContent = planData.meta.subtitle;
+      document.getElementById('page-status').textContent = planData.meta.statusNote;
+      document.getElementById('footer-note').textContent = `${planData.meta.subtitle} • ${planData.meta.statusNote}`;
+
+      renderTenDayGrid();
+      renderMetrics();
+      renderTLDR();
+      renderWeekPlan();
+      renderChanges();
+      renderAssumptions();
+      renderImpossible();
+      renderKids();
+      renderFuture();
+      renderBlackouts();
+      renderDailyGrid();
+    }
+
+    init();
+  </script>
+</body>
+</html>
