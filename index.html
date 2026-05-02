@@ -475,7 +475,7 @@
 <div class="top-bar">
   <h1>🎬 OMNIPLEX <span>WIGAN</span></h1>
   <div class="tab-row">
-    <button class="tab active" onclick="showPage('week')">This Week</button>
+    <button class="tab active" onclick="showPage('week')">Calendar</button>
     <button class="tab" onclick="showPage('future')">Coming Up</button>
     <button class="tab" onclick="showPage('screenings')">All Screenings</button>
     <button class="tab" onclick="showPage('impossible')">Can't Watch</button>
@@ -555,21 +555,9 @@ function showPage(name) {
   event.target.classList.add('active');
 }
 
-// ========== PAGE: THIS WEEK ==========
+// ========== PAGE: CALENDAR ==========
 function buildWeekPage() {
   const el = document.getElementById('page-week');
-
-  // Get dates for next 7 days
-  const todayDate = parseDateStr(TODAY);
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(todayDate);
-    d.setDate(d.getDate() + i);
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    days.push(`${y}-${m}-${day}`);
-  }
 
   // Build schedule map
   const schedMap = {};
@@ -579,12 +567,30 @@ function buildWeekPage() {
     schedMap[dt].push(s);
   });
 
+  // Get all dates from today through the last scheduled date
+  const todayDate = parseDateStr(TODAY);
+  const scheduledDates = DATA.schedule.map(s => s.showing.date).sort();
+  const lastDate = scheduledDates.length ? parseDateStr(scheduledDates[scheduledDates.length - 1]) : todayDate;
+
+  // Build list of every date from today to lastDate
+  const days = [];
+  const cursor = new Date(todayDate);
+  while (cursor <= lastDate) {
+    const y = cursor.getFullYear();
+    const m = String(cursor.getMonth()+1).padStart(2,'0');
+    const d = String(cursor.getDate()).padStart(2,'0');
+    days.push(`${y}-${m}-${d}`);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   let html = `
     <div class="week-header">
-      <h2>THIS WEEK</h2>
-      <span class="subtitle">Next 7 days</span>
+      <h2>CALENDAR</h2>
+      <span class="subtitle">${DATA.schedule.length} films scheduled</span>
     </div>
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--owen)"></div> Owen</div>
@@ -595,25 +601,68 @@ function buildWeekPage() {
     </div>
   `;
 
+  // Availability blocks and notes per date
+  const dayNotes = {
+    '2026-05-02': ['🏉 Warriors vs Bradford Bulls (home)', '⚽ Athletic home game'],
+    '2026-05-06': ['❌ Everyone unavailable'],
+    '2026-05-07': ['❌ Everyone unavailable'],
+    '2026-05-09': ['🏉 Challenge Cup Semi-Final (away/neutral)'],
+    '2026-05-11': ['🎤 Maisie Peters gig — Conor & Alice unavailable'],
+    '2026-05-12': ['🎉 Eurovision — everyone unavailable'],
+    '2026-05-14': ['🎉 Eurovision — everyone unavailable'],
+    '2026-05-15': ['🏉 Warriors vs Leeds Rhinos (home)'],
+    '2026-05-16': ['🎉 Eurovision — everyone unavailable'],
+  };
+  // Weekday note generator
+  function getDayNotes(dateStr, dayName) {
+    const notes = [...(dayNotes[dateStr] || [])];
+    if (dayName === 'Sunday') notes.push('🕐 Owen working — films after 3pm only');
+    if (['Monday','Tuesday','Wednesday','Thursday','Friday'].includes(dayName)) notes.push('🕐 Owen working — films after 7:35pm only');
+    if (dayName === 'Thursday' && dateStr >= '2026-05-28') notes.push('🍺 Pub quiz — Conor & Owen unavailable');
+    return notes;
+  }
+
+  let currentMonth = null;
+
   days.forEach(dateStr => {
     const d = parseDateStr(dateStr);
     const dayName = dayNames[d.getDay()];
     const films = schedMap[dateStr] || [];
     const isToday = dateStr === TODAY;
     const hasFilm = films.length > 0;
+    const notes = getDayNotes(dateStr, dayName);
+
+    // Month separator
+    const month = d.getMonth();
+    if (month !== currentMonth) {
+      currentMonth = month;
+      html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
+    }
 
     html += `<div class="day-block ${hasFilm ? 'has-film' : ''}">`;
     html += `<div class="day-header ${hasFilm ? 'has-film' : ''} ${isToday ? 'today' : ''}">`;
     html += `<span class="day-name">${dayName.toUpperCase()}</span>`;
     html += `<div style="display:flex;gap:8px;align-items:center">`;
     if (isToday) html += `<span class="today-badge">TODAY</span>`;
-    html += `<span class="day-date">${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}</span>`;
+    html += `<span class="day-date">${d.getDate()} ${monthNames[d.getMonth()]}</span>`;
     html += `</div></div>`;
 
-    if (films.length === 0) {
-      html += `<div class="empty-day">Nothing scheduled</div>`;
+    if (!hasFilm) {
+      // Show notes if any, otherwise just a clean empty row
+      if (notes.length > 0) {
+        notes.forEach(note => {
+          html += `<div style="padding:5px 14px;font-size:12px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border)">${note}</div>`;
+        });
+      } else {
+        html += `<div class="empty-day">—</div>`;
+      }
     } else {
-      // Sort by start time
+      // Notes above films if present
+      if (notes.length > 0) {
+        notes.forEach(note => {
+          html += `<div style="padding:5px 14px;font-size:12px;color:var(--muted);background:var(--bg);border-top:1px solid var(--border)">${note}</div>`;
+        });
+      }
       const sorted = [...films].sort((a, b) => a.showing.start.localeCompare(b.showing.start));
       sorted.forEach((f, i) => {
         const s = f.showing;
@@ -627,7 +676,6 @@ function buildWeekPage() {
         html += `<div class="attendees-row">${attendeeChips(s.attendees)}</div>`;
         html += `</div>`;
 
-        // Gap indicator between consecutive films
         if (i < sorted.length - 1) {
           const endMins = timeToMins(s.end);
           const nextStartMins = timeToMins(sorted[i+1].showing.start);
