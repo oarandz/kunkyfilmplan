@@ -844,15 +844,14 @@ function buildFuturePage() {
     }
   });
 
-  // Also find scheduled items beyond this week
-  const futureScheduled = DATA.schedule.filter(s => s.showing.date >= cutoff);
+  // Sort all films by their scheduled date (if scheduled), then by first available showing
   const scheduledMap = {};
-  futureScheduled.forEach(s => { scheduledMap[s.title] = s; });
+  DATA.schedule.forEach(s => { scheduledMap[s.title] = s; });
 
   futureFilms.sort((a, b) => {
-    const ad = a.futureShowings[0]?.date || '9999';
-    const bd = b.futureShowings[0]?.date || '9999';
-    return ad.localeCompare(bd);
+    const aDate = scheduledMap[a.title]?.showing.date || a.futureShowings[0]?.date || '9999';
+    const bDate = scheduledMap[b.title]?.showing.date || b.futureShowings[0]?.date || '9999';
+    return aDate.localeCompare(bDate);
   });
 
   const newFuture = futureFilms.filter(f => !f.is_rerelease);
@@ -871,7 +870,7 @@ function buildFuturePage() {
       }
       if (scheduled) {
         html += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(232,196,90,0.1);border-radius:6px;border:1px solid rgba(232,196,90,0.3);font-size:12px;color:var(--accent)">`;
-        html += `📅 Scheduled: ${formatDate(scheduled.showing.date)} at ${scheduled.showing.start} — ${attendeeChips(scheduled.showing.attendees)}</div>`;
+        html += `📅 Scheduled: ${formatDate(scheduled.showing.date)} at ${scheduled.showing.start}</div>`;
       }
       html += `<div class="future-date-row">`;
       topShowings.forEach(s => {
@@ -886,7 +885,7 @@ function buildFuturePage() {
     return html;
   }
 
-  let html = `<div class="week-header"><h2>COMING UP</h2><span class="subtitle">Beyond next 7 days</span></div>`;
+  let html = `<div class="week-header"><h2>COMING UP</h2><span class="subtitle">Ordered by scheduled date</span></div>`;
 
   if (futureFilms.length === 0) {
     html += `<div class="no-results">No upcoming scheduled screenings beyond this week.</div>`;
@@ -902,18 +901,42 @@ function buildFuturePage() {
 function buildScreeningsPage() {
   const el = document.getElementById('page-screenings');
 
-  const newFilms = DATA.all_films.filter(f => !f.is_rerelease);
-  const reFilms = DATA.all_films.filter(f => f.is_rerelease);
+  // Sort by last watchable showing date (most urgent first)
+  function lastWatchableDate(film) {
+    const watchable = film.showings.filter(s => !s.blocked && s.all_can_watch);
+    if (!watchable.length) return '9999';
+    return watchable.reduce((max, s) => s.date > max ? s.date : max, '0000');
+  }
+
+  const allFilmsSorted = [...DATA.all_films].sort((a, b) =>
+    lastWatchableDate(a).localeCompare(lastWatchableDate(b))
+  );
+  const newFilms = allFilmsSorted.filter(f => !f.is_rerelease);
+  const reFilms = allFilmsSorted.filter(f => f.is_rerelease);
+
+  // Build by-date index
+  const byDate = {};
+  DATA.all_films.forEach(film => {
+    film.showings.forEach(s => {
+      if (s.blocked) return;
+      if (!byDate[s.date]) byDate[s.date] = [];
+      byDate[s.date].push({ film, showing: s });
+    });
+  });
 
   function renderFilmGroup(film) {
-    const watchableCount = film.showings.filter(s => !s.blocked).length;
+    const watchableCount = film.showings.filter(s => !s.blocked && s.all_can_watch).length;
+    const lastDate = lastWatchableDate(film);
     const id = 'fg_' + film.title.replace(/[^a-z0-9]/gi, '');
     let html = `<div class="film-group" id="${id}">`;
     html += `<div class="film-group-header" onclick="toggleGroup('${id}')">`;
     html += typeBadge(film.title, film.is_rerelease, film.showings.some(s => s.is_maxx));
     html += ratingBadge(film.rating);
     html += `<span class="film-name">${film.title}</span>`;
-    html += `<span style="font-size:11px;color:var(--muted)">${watchableCount} watchable</span>`;
+    if (lastDate !== '9999') {
+      const urgency = lastDate <= TODAY ? 'var(--danger)' : lastDate <= addDays(TODAY, 7) ? 'var(--accent)' : 'var(--muted)';
+      html += `<span style="font-size:11px;color:${urgency};margin-left:auto;padding-right:6px;">last: ${formatDate(lastDate)}</span>`;
+    }
     html += `<span class="expand-icon">▼</span>`;
     html += `</div>`;
     html += `<div class="film-group-showings">`;
@@ -934,21 +957,92 @@ function buildScreeningsPage() {
     return html;
   }
 
+  function renderByDate() {
+    const dates = Object.keys(byDate).sort();
+    if (!dates.length) return `<div class="no-results">No available screenings found.</div>`;
+    let html = '';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const monthsFull = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    let currentMonth = null;
+    dates.forEach(dateStr => {
+      const d = parseDateStr(dateStr);
+      const month = d.getMonth();
+      if (month !== currentMonth) {
+        currentMonth = month;
+        html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
+      }
+      const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const dayName = dayNames[d.getDay()];
+      const entries = byDate[dateStr].sort((a,b) => a.showing.start.localeCompare(b.showing.start));
+      html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">`;
+      html += `<div class="day-header has-film"><span class="day-name">${dayName.toUpperCase()}</span><span class="day-date">${d.getDate()} ${months[month]}</span></div>`;
+      entries.forEach(({film, showing}) => {
+        html += `<div class="film-card" style="border-top:1px solid var(--border);">`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">`;
+        html += `<div style="flex:1;min-width:0;">`;
+        html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">${typeBadge(film.title, film.is_rerelease, showing.is_maxx)}${ratingBadge(film.rating)}</div>`;
+        html += `<div class="film-name">${film.title}</div>`;
+        html += `</div>`;
+        html += `<div style="text-align:right;flex-shrink:0;">`;
+        html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);line-height:1">${showing.start}</div>`;
+        html += `<div style="font-size:11px;color:var(--muted);">ends ${showing.end}</div>`;
+        if (showing.screen) html += `<div style="font-size:11px;color:var(--muted);">${showing.screen}</div>`;
+        html += `</div></div>`;
+        if (film.genres && film.genres.length) html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">${genreChips(film.genres)}</div>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+    return html;
+  }
+
+  // Build full HTML with view toggle
+  const totalWatchable = DATA.all_films.reduce((a,f) => a + f.showings.filter(s=>!s.blocked && s.all_can_watch).length, 0);
+
   let html = `<div class="week-header"><h2>ALL SCREENINGS</h2><span class="subtitle">Every available showing</span></div>`;
-  html += `<input class="search-box" type="text" placeholder="Search films..." oninput="filterScreenings(this.value)" id="screenSearch">`;
-  html += `<div class="count-row">`;
-  html += `<span class="count-chip"><strong>${DATA.all_films.length}</strong> films</span>`;
-  const totalWatchable = DATA.all_films.reduce((a,f) => a + f.showings.filter(s=>!s.blocked).length, 0);
-  html += `<span class="count-chip"><strong>${totalWatchable}</strong> watchable showings</span>`;
+
+  // View toggle
+  html += `<div style="display:flex;gap:8px;margin-bottom:12px;">`;
+  html += `<button id="view-by-film" onclick="switchScreeningsView('film')" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;">By Film</button>`;
+  html += `<button id="view-by-date" onclick="switchScreeningsView('date')" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer;">By Date</button>`;
   html += `</div>`;
+
+  // By Film view
+  html += `<div id="screenings-by-film">`;
+  html += `<input class="search-box" type="text" placeholder="Search films..." oninput="filterScreenings(this.value)" id="screenSearch">`;
+  html += `<div class="count-row"><span class="count-chip"><strong>${DATA.all_films.length}</strong> films</span><span class="count-chip"><strong>${totalWatchable}</strong> watchable showings</span></div>`;
   html += `<div id="screenings-list">`;
-  html += `<div class="section-title">NEW FILMS<span class="section-count">${newFilms.length}</span></div>`;
+  html += `<div class="section-title">NEW FILMS <span style="font-size:11px;font-weight:400;color:var(--muted);letter-spacing:0;">sorted by last screening date</span><span class="section-count">${newFilms.length}</span></div>`;
   newFilms.forEach(f => { html += renderFilmGroup(f); });
   html += `<div class="section-title" style="margin-top:16px">RE-RELEASES & EVENTS<span class="section-count">${reFilms.length}</span></div>`;
   reFilms.forEach(f => { html += renderFilmGroup(f); });
+  html += `</div></div>`;
+
+  // By Date view
+  html += `<div id="screenings-by-date" style="display:none;">`;
+  html += renderByDate();
   html += `</div>`;
 
   el.innerHTML = html;
+}
+
+function addDays(dateStr, n) {
+  const d = parseDateStr(dateStr);
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function switchScreeningsView(view) {
+  document.getElementById('screenings-by-film').style.display = view === 'film' ? '' : 'none';
+  document.getElementById('screenings-by-date').style.display = view === 'date' ? '' : 'none';
+  const filmBtn = document.getElementById('view-by-film');
+  const dateBtn = document.getElementById('view-by-date');
+  filmBtn.style.background = view === 'film' ? 'var(--accent)' : 'var(--surface2)';
+  filmBtn.style.color = view === 'film' ? 'var(--bg)' : 'var(--muted)';
+  filmBtn.style.border = view === 'film' ? 'none' : '1px solid var(--border)';
+  dateBtn.style.background = view === 'date' ? 'var(--accent)' : 'var(--surface2)';
+  dateBtn.style.color = view === 'date' ? 'var(--bg)' : 'var(--muted)';
+  dateBtn.style.border = view === 'date' ? 'none' : '1px solid var(--border)';
 }
 
 function toggleGroup(id) {
@@ -958,6 +1052,7 @@ function toggleGroup(id) {
 
 function filterScreenings(val) {
   const v = val.toLowerCase();
+
   document.querySelectorAll('#screenings-list .film-group').forEach(g => {
     const title = g.querySelector('.film-name').textContent.toLowerCase();
     g.style.display = title.includes(v) ? '' : 'none';
