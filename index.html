@@ -629,6 +629,8 @@ function showPage(name) {
 }
 
 // ========== PAGE: CALENDAR ==========
+const PRE_SHOW_MINS = 20; // Standard Omniplex ads/trailers buffer before film starts
+
 function buildWeekPage() {
   const el = document.getElementById('page-week');
 
@@ -666,13 +668,55 @@ function buildWeekPage() {
       <span class="subtitle">${DATA.schedule.length} films scheduled</span>
     </div>
     <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--owen)"></div> Owen</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--conor)"></div> Conor</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--alice)"></div> Alice</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--new)"></div> New Film</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--rerelease)"></div> Re-release</div>
     </div>
   `;
+
+  // Build a map of showing timings for countdown logic
+  // Key insight: slot end time IS film end time (Omniplex lists actual end, not including cleanup)
+  // Film start = slot start + pre-show buffer
+  // Pre-show buffer = slot duration - film runtime
+  // Since we don't always have runtime, use slot duration as a proxy
+  // (Omniplex pads ~20min of ads before the listed start, the listed end is the actual film end)
+  // So: film start = slot start + 20min, film end = slot end (no further adjustment needed)
+
+  function showingMs(dateStr, timeStr) {
+    const d = parseDateStr(dateStr);
+    const [h, m] = timeStr.split(':').map(Number);
+    d.setHours(h, m, 0, 0);
+    return d.getTime();
+  }
+
+  // Classify each scheduled film's status relative to now
+  function getFilmStatus(showing) {
+    const now = Date.now();
+    const slotStartMs = showingMs(showing.date, showing.start);
+    const filmStartMs = slotStartMs + PRE_SHOW_MINS * 60000;
+    const filmEndMs = showingMs(showing.date, showing.end);
+    if (now < slotStartMs) return { state: 'upcoming', targetMs: filmStartMs, label: 'film starts' };
+    if (now >= slotStartMs && now < filmStartMs) return { state: 'ads', targetMs: filmStartMs, label: 'film starts' };
+    if (now >= filmStartMs && now < filmEndMs) return { state: 'showing', targetMs: filmEndMs, label: 'film ends' };
+    return { state: 'finished', targetMs: null, label: null };
+  }
+
+  // Find the "active" film: currently showing or next upcoming
+  let activeCdId = null;
+  const now = Date.now();
+  const allShowings = DATA.schedule.map(s => ({
+    title: s.title, showing: s.showing,
+    slotStartMs: showingMs(s.showing.date, s.showing.start),
+    filmStartMs: showingMs(s.showing.date, s.showing.start) + PRE_SHOW_MINS * 60000,
+    filmEndMs: showingMs(s.showing.date, s.showing.end),
+  })).sort((a,b) => a.slotStartMs - b.slotStartMs);
+
+  // Active = currently showing, or if none, the next upcoming
+  let activeShowing = allShowings.find(s => now >= s.slotStartMs && now < s.filmEndMs);
+  if (!activeShowing) activeShowing = allShowings.find(s => s.slotStartMs > now);
+
+  if (activeShowing) {
+    activeCdId = 'cd_' + activeShowing.showing.date + '_' + activeShowing.showing.start.replace(':','');
+  }
 
   const HOME_GAME_DATES = new Set([
     // Warriors (RL)
@@ -687,7 +731,7 @@ function buildWeekPage() {
     '2026-02-28','2026-03-14','2026-03-21','2026-04-11','2026-04-18',
   ]);
 
-  const BANK_HOLIDAYS_RELAXED = new Set(['2026-05-25']); // Owen's normal constraints lifted
+  const BANK_HOLIDAYS_RELAXED = new Set(['2026-05-25']);
 
   const dayNotes = {
     '2026-05-07': ['🎤 Baby No Money gig — Conor & Alice unavailable'],
@@ -705,7 +749,6 @@ function buildWeekPage() {
     '2026-05-25': ["🏖️ Bank holiday — Owen's normal time constraints relaxed"],
     '2026-05-27': ['🚂 Alice in London'],
     '2026-05-29': ['🎤 Gig — Conor & Alice unavailable'],
-    '2026-05-25': ['🏖️ Bank holiday — Owen\'s normal time constraints relaxed'],
     '2026-06-13': ['🎵 Clog Men gig — everyone unavailable'],
     '2026-06-20': ['🚗 Nottingham Escape Trip — everyone unavailable'],
     '2026-06-21': ['🚗 Nottingham Escape Trip — everyone unavailable'],
@@ -746,7 +789,6 @@ function buildWeekPage() {
     const hasFilm = films.length > 0;
     const notes = getDayNotes(dateStr, dayName);
 
-    // Month separator
     const month = d.getMonth();
     if (month !== currentMonth) {
       currentMonth = month;
@@ -774,27 +816,63 @@ function buildWeekPage() {
       sorted.forEach((f, i) => {
         const s = f.showing;
         html += `<div class="film-card">`;
-        // Row 1: title left, time right — vertically aligned
-        html += `<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:6px;">`;
-        html += `<div class="film-name" style="flex:1;min-width:0;">${f.title}</div>`;
-        html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1;flex-shrink:0;">${s.start}</span>`;
-        html += `</div>`;
-        // Row 2: badges left, end time + screen right
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:${f.genres && f.genres.length ? '6px' : '0'}">`;
-        html += `<div style="display:flex;gap:5px;flex-wrap:wrap;">${typeBadge(f.title, f.is_rerelease, s.is_maxx)}${ratingBadge(f.rating)}</div>`;
-        html += `<div style="text-align:right;flex-shrink:0;">`;
-        html += `<span style="font-size:11px;color:var(--muted);">ends ${s.end}</span>`;
-        if (s.screen) html += `<span style="font-size:11px;color:var(--muted);"> · ${s.screen}</span>`;
-        html += `</div>`;
-        html += `</div>`;
-        // Row 3: genres left, button right
-        if (f.genres && f.genres.length || s.url) {
-          html += `<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">`;
-          html += `<div style="display:flex;gap:4px;flex-wrap:wrap;">${f.genres && f.genres.length ? genreChips(f.genres) : ''}</div>`;
-          if (s.url) html += availBtn(s.url);
-          html += `</div>`;
+        // Check if this is the active countdown film
+        const cdId = 'cd_' + s.date + '_' + s.start.replace(':','');
+        const isActive = activeCdId === cdId;
+        const filmStartMs = showingMs(s.date, s.start) + PRE_SHOW_MINS * 60000;
+        const filmEndMs = showingMs(s.date, s.end);
+        const nowNow = Date.now();
+        const isShowing = nowNow >= showingMs(s.date, s.start) && nowNow < filmEndMs;
+        const targetMs = isShowing ? filmEndMs : filmStartMs;
+        const cdLabel = isShowing ? 'ends' : 'starts';
+
+        html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">`;
+        html += `<div style="flex:1;min-width:0;">`;
+        html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">${typeBadge(f.title, f.is_rerelease, s.is_maxx)}${ratingBadge(f.rating)}</div>`;
+        html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
+        html += `<div class="film-name">${f.title}</div>`;
+        if (isActive) {
+          html += `<span id="${cdId}" style="font-size:11px;font-weight:700;color:var(--danger);white-space:nowrap;font-family:monospace;"></span>`;
+          html += `<span style="font-size:10px;color:var(--muted);">${cdLabel}</span>`;
         }
         html += `</div>`;
+        if (f.genres && f.genres.length) html += `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">${genreChips(f.genres)}</div>`;
+        html += `</div>`;
+        html += `<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">`;
+        html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1">${s.start}</span>`;
+        html += `<span style="font-size:11px;color:var(--muted);">ends ${s.end}</span>`;
+        if (s.screen) html += `<span style="font-size:11px;color:var(--muted);">${s.screen}</span>`;
+        if (s.url) html += `<div style="margin-top:4px;">${availBtn(s.url)}</div>`;
+        html += `</div></div>`;
+        html += `</div>`;
+
+        // Register countdown ticker for active film
+        if (isActive) {
+          setTimeout(() => {
+            function tick() {
+              const el = document.getElementById(cdId);
+              if (!el) return;
+              const diff = targetMs - Date.now();
+              if (diff <= 0) {
+                // Re-evaluate: if was counting to film start, now switch to counting to end
+                // Just reload the calendar to recalculate
+                buildWeekPage();
+                return;
+              }
+              const totalMins = Math.floor(diff / 60000);
+              const hrs = Math.floor(totalMins / 60);
+              const mins = totalMins % 60;
+              const secs = Math.floor((diff % 60000) / 1000);
+              if (hrs > 0) {
+                el.textContent = `${hrs}h ${String(mins).padStart(2,'0')}m ${String(secs).padStart(2,'0')}s`;
+              } else {
+                el.textContent = `${String(mins).padStart(2,'0')}m ${String(secs).padStart(2,'0')}s`;
+              }
+              setTimeout(tick, 1000);
+            }
+            tick();
+          }, 50);
+        }
 
         if (i < sorted.length - 1) {
           const endMins = timeToMins(s.end);
