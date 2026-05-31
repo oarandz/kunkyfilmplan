@@ -1893,6 +1893,9 @@ function renderProfile(person, allReviews) {
   const personColor = `var(--${person.toLowerCase()})`;
   let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${myReviews.length} reviews · sorted by score</div>`;
 
+  // Store for index lookup by delete/edit
+  window._profileReviews = myReviews;
+
   myReviews.forEach((r, i) => {
     const raw = parseFloat(r.raw);
     const rowId = 'prof-row-' + i;
@@ -1917,10 +1920,10 @@ function renderProfile(person, allReviews) {
       html += `</div>`;
     }
     // Actions
-    const escaped = JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const escaped = encodeURIComponent(r.film);
     html += `<div style="display:flex;gap:8px;">`;
-    html += `<button onclick="startEditReview(${i}, this)" data-review='${JSON.stringify(r).replace(/'/g,"\\'")}' style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer;">Edit</button>`;
-    html += `<button onclick="deleteReview('${r.film}', '${r.person}', '${r.timestamp || ''}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.1);color:var(--danger);border:1px solid rgba(248,113,113,0.3);cursor:pointer;">Delete</button>`;
+    html += `<button onclick="startEditReview(${i})" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer;">Edit</button>`;
+    html += `<button onclick="deleteReview(${i}, '${r.person}')" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:rgba(248,113,113,0.1);color:var(--danger);border:1px solid rgba(248,113,113,0.3);cursor:pointer;">Delete</button>`;
     html += `</div>`;
     html += `</div>`; // end view mode
 
@@ -1946,7 +1949,7 @@ function renderProfile(person, allReviews) {
     html += `</div>`;
     html += `<div id="${rowId}-score" style="font-size:12px;color:var(--muted);margin-bottom:8px;"></div>`;
     html += `<div style="display:flex;gap:8px;">`;
-    html += `<button onclick="saveEditReview('${rowId}', '${r.film}', '${r.person}', '${r.timestamp || ''}')" style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;">Save</button>`;
+    html += `<button onclick="saveEditReview('${rowId}', '${r.person}')" style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;">Save</button>`;
     html += `<button onclick="cancelEditReview('${rowId}')" style="font-size:11px;font-weight:700;padding:5px 12px;border-radius:6px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer;">Cancel</button>`;
     html += `</div>`;
     html += `</div>`; // end edit mode
@@ -1991,7 +1994,10 @@ function cancelEditReview(rowId) {
   document.getElementById(rowId + '-edit').style.display = 'none';
 }
 
-async function saveEditReview(rowId, film, person, timestamp) {
+async function saveEditReview(rowId, person) {
+  const review = window._profileReviews[parseInt(rowId.replace('prof-row-',''))];
+  if (!review) { alert('Could not find review data.'); return; }
+
   let raw = 0;
   const scores = {};
   CATEGORIES.forEach(cat => {
@@ -2003,38 +2009,48 @@ async function saveEditReview(rowId, film, person, timestamp) {
   const rounded = Math.round(raw * 2) / 2;
   const pct = Math.round((raw / 5) * 100);
 
-  // Build URL params so we can use GET (avoids no-cors issues with POST)
   const params = new URLSearchParams({
     action: 'edit',
-    film, person, timestamp, notes,
-    raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct,
-    newTimestamp: new Date().toISOString(),
+    film: review.film,
+    person,
+    matchFilm: review.film,
+    matchPerson: person,
+    matchRaw: review.raw,
+    notes: notes || '',
+    raw: raw.toFixed(2),
+    rounded: rounded.toFixed(1),
+    pct,
     ...Object.fromEntries(CATEGORIES.map(cat => [cat.id, scores[cat.id]]))
   });
 
   try {
     const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
     const text = await res.text();
-    if (text.includes('OK') || text.includes('ok') || res.ok) {
-      _reviewCache = null;
-      await loadProfile(person);
-    } else {
-      alert('Unexpected response: ' + text);
-    }
+    console.log('Edit response:', text);
+    _reviewCache = null;
+    await loadProfile(person);
   } catch(e) {
     alert('Error saving: ' + e.message);
   }
 }
 
-async function deleteReview(film, person, timestamp) {
-  if (!confirm(`Delete your review of "${film}"?`)) return;
+async function deleteReview(idx, person) {
+  const review = window._profileReviews[idx];
+  if (!review) { alert('Could not find review.'); return; }
+  if (!confirm(`Delete ${person}'s review of "${review.film}"?`)) return;
 
-  const params = new URLSearchParams({ action: 'delete', film, person, timestamp });
+  const params = new URLSearchParams({
+    action: 'delete',
+    matchFilm: review.film,
+    matchPerson: person,
+    matchRaw: review.raw,
+  });
 
   try {
     const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
     const text = await res.text();
-    if (text.includes('OK') || text.includes('ok') || res.ok) {
+    console.log('Delete response:', text);
+    if (res.ok) {
       _reviewCache = null;
       await loadProfile(person);
     } else {
