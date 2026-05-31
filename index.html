@@ -2173,7 +2173,32 @@ function renderReviewTable(data) {
     html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
     html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${scoreVal.toFixed(2)}</span>`;
     html += `</div>`;
-    // Per-person scores
+    // Per-person scores with visual line
+    if (item.reviews.length > 1) {
+      // Score line
+      html += `<div style="position:relative;height:20px;margin:8px 0 4px;">`;
+      // Track line
+      html += `<div style="position:absolute;top:50%;left:0;right:0;height:2px;background:var(--border);transform:translateY(-50%);border-radius:1px;"></div>`;
+      // Tick marks at 0,1,2,3,4,5
+      [0,1,2,3,4,5].forEach(v => {
+        const pct = (v/5)*100;
+        html += `<div style="position:absolute;top:50%;left:${pct}%;width:1px;height:6px;background:var(--border);transform:translate(-50%,-50%);"></div>`;
+      });
+      // Person dots
+      item.reviews.forEach(r => {
+        const val = sortBy === 'overall' ? parseFloat(r.raw) : parseFloat(r[sortBy] || 0);
+        const pct = (val / 5) * 100;
+        const col = personColors[r.person] || 'var(--muted)';
+        html += `<div title="${r.person}: ${val.toFixed(2)}" style="position:absolute;top:50%;left:${pct}%;width:10px;height:10px;border-radius:50%;background:${col};transform:translate(-50%,-50%);border:2px solid var(--surface);box-sizing:border-box;z-index:1;"></div>`;
+      });
+      html += `</div>`;
+      // Labels below dots
+      html += `<div style="display:flex;justify-content:space-between;margin-bottom:6px;">`;
+      [0,1,2,3,4,5].forEach(v => {
+        html += `<span style="font-size:9px;color:var(--muted);">${v}</span>`;
+      });
+      html += `</div>`;
+    }
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">`;
     item.reviews.forEach(r => {
       const displayVal = sortBy === 'overall' ? parseFloat(r.raw).toFixed(2) : parseFloat(r[sortBy] || 0).toFixed(1);
