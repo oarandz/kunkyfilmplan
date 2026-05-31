@@ -1859,12 +1859,12 @@ function renderReviewTable(data) {
   let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${filmRankings.length} films · ${filtered.length} reviews</div>`;
 
   filmRankings.forEach((item, rank) => {
-    const rounded = Math.round(item.avg * 2) / 2;
+    const avgRaw = item.avg;
     html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">`;
     html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">`;
     html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
     html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${rounded.toFixed(1)}</span>`;
+    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${avgRaw.toFixed(2)}</span>`;
     html += `</div>`;
     // Individual scores
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">`;
