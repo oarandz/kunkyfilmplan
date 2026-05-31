@@ -2003,15 +2003,24 @@ async function saveEditReview(rowId, film, person, timestamp) {
   const rounded = Math.round(raw * 2) / 2;
   const pct = Math.round((raw / 5) * 100);
 
-  const payload = { action: 'edit', film, person, timestamp, notes, scores,
+  // Build URL params so we can use GET (avoids no-cors issues with POST)
+  const params = new URLSearchParams({
+    action: 'edit',
+    film, person, timestamp, notes,
     raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct,
-    newTimestamp: new Date().toISOString() };
+    newTimestamp: new Date().toISOString(),
+    ...Object.fromEntries(CATEGORIES.map(cat => [cat.id, scores[cat.id]]))
+  });
 
   try {
-    await fetch(REVIEWS_WEBHOOK_URL, { method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    _reviewCache = null;
-    await loadProfile(person);
+    const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
+    const text = await res.text();
+    if (text.includes('OK') || text.includes('ok') || res.ok) {
+      _reviewCache = null;
+      await loadProfile(person);
+    } else {
+      alert('Unexpected response: ' + text);
+    }
   } catch(e) {
     alert('Error saving: ' + e.message);
   }
@@ -2019,12 +2028,18 @@ async function saveEditReview(rowId, film, person, timestamp) {
 
 async function deleteReview(film, person, timestamp) {
   if (!confirm(`Delete your review of "${film}"?`)) return;
-  const payload = { action: 'delete', film, person, timestamp };
+
+  const params = new URLSearchParams({ action: 'delete', film, person, timestamp });
+
   try {
-    await fetch(REVIEWS_WEBHOOK_URL, { method: 'POST', mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-    _reviewCache = null;
-    await loadProfile(person);
+    const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
+    const text = await res.text();
+    if (text.includes('OK') || text.includes('ok') || res.ok) {
+      _reviewCache = null;
+      await loadProfile(person);
+    } else {
+      alert('Unexpected response: ' + text);
+    }
   } catch(e) {
     alert('Error deleting: ' + e.message);
   }
