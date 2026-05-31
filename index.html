@@ -539,6 +539,7 @@
     <button class="tab" onclick="showPage('kids')">Kids Removed</button>
     <button class="tab" onclick="showPage('missed')">Missed</button>
     <button class="tab" onclick="showPage('stats')">Stats</button>
+    <button class="tab" onclick="showPage('reviews')">Reviews</button>
     <button class="tab" onclick="showPage('fixtures')">🏉 Fixtures</button>
   </div>
 </div>
@@ -550,6 +551,7 @@
 <div id="page-kids" class="page"></div>
 <div id="page-missed" class="page"></div>
 <div id="page-stats" class="page"></div>
+<div id="page-reviews" class="page"></div>
 <div id="page-fixtures" class="page"></div>
 
 <script>
@@ -1537,7 +1539,349 @@ function drawBarChart(canvasId, labels, values) {
   });
 }
 
-// ========== FIXTURES DATA ==========
+// ========== REVIEWS DATA ==========
+const ALL_FILM_TITLES = ["After The Hunt", "Akira (Re Release) (Subtitled)", "Anaconda", "Anemone", "Back To The Future (40th Anniversary)", "Backrooms", "Bridget Jones's Diary (25th Anniversary)", "Bring Her Back", "Bugonia", "Caught Stealing", "Challenge Cup Final: Wigan Warriors v Hull KR", "Charlie The Wonderdog", "Cold Storage", "Crime 101", "Dead of Winter", "Disclosure Day", "Dragonfly", "Drishyam 3 (Malayalam)", "EPiC: Elvis Presley in Concert", "Eternity", "Exit 8", "Fackham Hall", "Finding Emily", "Five Nights at Freddy\u2019s 2", "Fuze", "Glenrothan", "Good Boy", "Good Fortune", "Good Luck, Have Fun, Don\u2019t Die", "H Is for Hawk", "Hamnet", "Hokum", "Honey Don\u2019t!", "How to Make a Killing", "I Swear", "Iron Lung", "K-Pop Demon Hunters (A Sing-Along Event)", "Keeper", "Lee Cronin's The Mummy", "Les Liaisons Dangereuses - National Theatre", "Marty Supreme", "Masters Of The Universe", "Materialists", "Mercy", "Michael", "Mortal Kombat II", "Mothers Pride", "Musik", "MyOmniPass Member Only Mystery Screening", "Nobody 2", "Normal", "Now You See Me: Now You Don\u2019t", "Nuremberg", "Obsession", "One Battle After Another - Oscar Season", "Passenger", "Power Ballad", "Predator: Badlands", "Primate", "Project Hail Mary", "Ready or Not 2: Here I Come", "Regretting You", "Reminders of Him", "Return to Silent Hill", "Roofman", "Saipan (GB)", "Scary Movie", "Scream 7", "Secret Screening", "Send Help", "Sentimental Value", "Shelby Oaks", "Shelter", "Sinners - Oscar Season", "Song Sung Blue", "Springsteen: Deliver Me from Nowhere", "Star Wars: The Mandalorian and Grogu", "Star Wars: The Mandalorian and Grogu (3D)", "Strangers: Chapter 3", "Taylor Swift: The Official Release Party of a Showgirl", "The Amazing Digital Circus: The Last Act", "The Black Phone 2", "The Bride!", "The Conjuring: Last Rites", "The Devil Wears Prada 2", "The Drama", "The Good Boy", "The History of Sound", "The Housemaid", "The Life of Chuck", "The Long Walk", "The Magic Faraway Tree", "The Naked Gun", "The Playboy of the Western World - National Theatre", "The Polar Express (2004) (Christmas Bring it Back)", "The Roses", "The Running Man", "The Sheep Detectives", "The Smashing Machine", "The Strangers: Chapter 2", "The Super Mario Galaxy Movie", "They Will Kill You", "Together", "Tom & Jerry Forbidden Compass", "Toy Story 5", "Tron: Ares", "Undertone", "Wake Up Dead Man: A Knives Out Mystery", "Weapons", "Whistle", "Wicked: For Good", "Women's Challenge Cup Final: Wigan Warriors v St Helens", "Wuthering Heights", "Years Later: Bone Temple", "You, Me & Tuscany"];
+
+// Google Apps Script Web App URL — set this after deploying your script
+const REVIEWS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbweQK5hHzlsfOCrKNivwW60ShwAUDb_d4wFEALf4999Vg83r0GeMyrbcdqltAsfjUc3pw/exec';
+
+const CATEGORIES = [
+  { id: 'enjoyment',    label: 'Enjoyment',                weight: 0.20, desc: 'How much, regardless of anything else, you enjoyed the film. Did it grip you, affect you or make you feel something?' },
+  { id: 'story',        label: 'Story',                    weight: 0.15, desc: 'Narrative clarity, momentum, structure and how well it holds together.' },
+  { id: 'characters',   label: 'Characters & Performance', weight: 0.15, desc: 'Writing, acting, presence, chemistry and character impact.' },
+  { id: 'craft',        label: 'Filmmaking Craft',         weight: 0.10, desc: 'Direction, cinematography, editing, sound and technical execution.' },
+  { id: 'atmosphere',   label: 'Atmosphere & Tone',        weight: 0.10, desc: 'Mood, tension, immersion, and how well the film sustains its feeling.' },
+  { id: 'ideas',        label: 'Ideas & Themes',           weight: 0.10, desc: 'Depth, meaning, intellectual interest and what the film is saying.' },
+  { id: 'originality',  label: 'Originality',              weight: 0.10, desc: 'Distinctiveness, freshness and how much it stands out.' },
+];
+
+// Remaining 10% = "Gut Feeling" / overall impression implied by weighted total — weights sum to 1.0 above
+
+const RATING_LABELS = {
+  0: 'No redeeming value', 0.5: 'Awful', 1.0: 'Very Bad', 1.5: 'Bad',
+  2.0: 'Weak', 2.5: 'Flawed but okay', 3.0: 'Decent', 3.5: 'Good',
+  4.0: 'Very Good', 4.5: 'Excellent', 5.0: 'Exceptional'
+};
+
+function getRatingLabel(val) {
+  const rounded = Math.round(val * 2) / 2;
+  return RATING_LABELS[rounded] || '';
+}
+
+// ========== PAGE: REVIEWS ==========
+function buildReviewsPage() {
+  const el = document.getElementById('page-reviews');
+
+  let html = `<div class="week-header"><h2>REVIEWS</h2><span class="subtitle">Rate & rank your films</span></div>`;
+
+  // View toggle
+  html += `<div style="display:flex;gap:8px;margin-bottom:16px;">
+    <button id="rev-btn-rate" onclick="showReviewSection('rate')" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;">Rate a Film</button>
+    <button id="rev-btn-view" onclick="showReviewSection('view')" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer;">View Reviews</button>
+  </div>`;
+
+  // ── RATE SECTION ──
+  html += `<div id="rev-rate-section">`;
+
+  // Person + film selectors
+  html += `<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">`;
+  html += `<div style="flex:1;min-width:120px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Reviewer</div>
+    <select id="rev-person" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;">
+      <option value="">Select...</option>
+      <option value="Owen">Owen</option>
+      <option value="Conor">Conor</option>
+      <option value="Alice">Alice</option>
+    </select>
+  </div>`;
+  html += `<div style="flex:2;min-width:180px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Film</div>
+    <input id="rev-film-search" type="text" placeholder="Search films..." autocomplete="off"
+      style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;box-sizing:border-box;"
+      oninput="filterFilmDropdown(this.value)" onfocus="showFilmDropdown()" />
+    <div id="rev-film-dropdown" style="display:none;position:absolute;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:200;width:calc(100% - 170px);min-width:200px;box-shadow:0 4px 20px rgba(0,0,0,0.4);"></div>
+    <input type="hidden" id="rev-film-value" />
+  </div>`;
+  html += `</div>`;
+
+  // Date watched
+  html += `<div style="margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Date Watched</div>
+    <input id="rev-date" type="date" value="${new Date().toISOString().slice(0,10)}"
+      style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;outline:none;color-scheme:dark;" />
+  </div>`;
+
+  // Category sliders
+  html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;">`;
+  CATEGORIES.forEach((cat, i) => {
+    html += `<div style="padding:12px 14px;${i>0?'border-top:1px solid var(--border);':''}">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">`;
+    html += `<div>
+      <div style="font-size:13px;font-weight:600;color:var(--text);">${cat.label} <span style="font-size:11px;color:var(--muted);">(${Math.round(cat.weight*100)}%)</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:1px;">${cat.desc}</div>
+    </div>`;
+    html += `<div style="text-align:right;flex-shrink:0;margin-left:10px;">
+      <div id="val-${cat.id}" style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">2.5</div>
+      <div id="lbl-${cat.id}" style="font-size:10px;color:var(--muted);white-space:nowrap;">Flawed but okay</div>
+    </div>`;
+    html += `</div>`;
+    // Slider
+    html += `<div style="position:relative;margin-top:6px;">
+      <input type="range" id="slider-${cat.id}" min="0" max="10" value="5" step="1"
+        oninput="updateSlider('${cat.id}')"
+        style="width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;cursor:pointer;" />
+    </div>`;
+    // Tick labels
+    html += `<div style="display:flex;justify-content:space-between;margin-top:3px;">`;
+    [0,1,2,3,4,5].forEach(v => {
+      html += `<span style="font-size:9px;color:var(--muted);">${v}</span>`;
+    });
+    html += `</div>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // Notes
+  html += `<div style="margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:6px;">Notes (optional)</div>
+    <textarea id="rev-notes" rows="3" placeholder="Any thoughts on the film..."
+      style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;"></textarea>
+  </div>`;
+
+  // Score preview
+  html += `<div id="score-preview" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:8px;">Calculated Score</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;">
+      <div><span id="score-raw" style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--accent);line-height:1;">2.50</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">/5 weighted</span></div>
+      <div><span id="score-rounded" style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--text);line-height:1;">2.5</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">rounded</span></div>
+      <div><span id="score-pct" style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--text);line-height:1;">50%</span></div>
+    </div>
+    <div id="score-label" style="font-size:13px;color:var(--muted);margin-top:4px;">Flawed but okay</div>
+  </div>`;
+
+  // Submit
+  html += `<button onclick="submitReview()" style="width:100%;background:var(--accent);color:var(--bg);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;padding:12px;border:none;border-radius:8px;cursor:pointer;">Save Review</button>`;
+  html += `<div id="rev-status" style="margin-top:8px;font-size:12px;text-align:center;color:var(--muted);min-height:18px;"></div>`;
+  html += `</div>`; // end rate section
+
+  // ── VIEW SECTION ──
+  html += `<div id="rev-view-section" style="display:none;">`;
+  html += `<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;" id="rev-person-filter">
+    <button onclick="setReviewFilter('All')" class="rev-filter-btn active" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--accent);color:var(--bg);border:none;cursor:pointer;">All</button>
+    <button onclick="setReviewFilter('Owen')" class="rev-filter-btn" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface2);color:var(--owen);border:1px solid var(--border);cursor:pointer;">Owen</button>
+    <button onclick="setReviewFilter('Conor')" class="rev-filter-btn" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface2);color:var(--conor);border:1px solid var(--border);cursor:pointer;">Conor</button>
+    <button onclick="setReviewFilter('Alice')" class="rev-filter-btn" style="font-size:12px;font-weight:700;padding:5px 12px;border-radius:20px;background:var(--surface2);color:var(--alice);border:1px solid var(--border);cursor:pointer;">Alice</button>
+  </div>`;
+  html += `<div id="rev-table-container"><div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading reviews...</div></div>`;
+  html += `</div>`; // end view section
+
+  el.innerHTML = html;
+
+  // Init sliders
+  CATEGORIES.forEach(cat => updateSlider(cat.id));
+  updateScorePreview();
+
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#rev-film-search') && !e.target.closest('#rev-film-dropdown')) {
+      document.getElementById('rev-film-dropdown').style.display = 'none';
+    }
+  }, { once: false });
+}
+
+function showReviewSection(section) {
+  document.getElementById('rev-rate-section').style.display = section === 'rate' ? '' : 'none';
+  document.getElementById('rev-view-section').style.display = section === 'view' ? '' : 'none';
+  ['rate','view'].forEach(s => {
+    const btn = document.getElementById('rev-btn-' + s);
+    if (!btn) return;
+    btn.style.background = s === section ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = s === section ? 'var(--bg)' : 'var(--muted)';
+    btn.style.border = s === section ? 'none' : '1px solid var(--border)';
+  });
+  if (section === 'view') loadReviews();
+}
+
+function filterFilmDropdown(query) {
+  const dd = document.getElementById('rev-film-dropdown');
+  const q = query.toLowerCase().trim();
+  const matches = q ? ALL_FILM_TITLES.filter(t => t.toLowerCase().includes(q)).slice(0, 30) : ALL_FILM_TITLES.slice(0, 30);
+  dd.innerHTML = matches.map(t =>
+    `<div onclick="selectFilm('${t.replace(/'/g, "\\'")}');event.stopPropagation();"
+      style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">${t}</div>`
+  ).join('') || `<div style="padding:8px 12px;color:var(--muted);font-size:13px;">No results</div>`;
+  dd.style.display = 'block';
+}
+
+function showFilmDropdown() {
+  filterFilmDropdown(document.getElementById('rev-film-search').value);
+}
+
+function selectFilm(title) {
+  document.getElementById('rev-film-search').value = title;
+  document.getElementById('rev-film-value').value = title;
+  document.getElementById('rev-film-dropdown').style.display = 'none';
+}
+
+function updateSlider(catId) {
+  const slider = document.getElementById('slider-' + catId);
+  const val = parseInt(slider.value) / 2;
+  document.getElementById('val-' + catId).textContent = val.toFixed(1);
+  document.getElementById('lbl-' + catId).textContent = getRatingLabel(val);
+  // Colour the slider track
+  const pct = (slider.value / 10) * 100;
+  slider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+  updateScorePreview();
+}
+
+function updateScorePreview() {
+  let raw = 0;
+  CATEGORIES.forEach(cat => {
+    const val = parseInt(document.getElementById('slider-' + cat.id)?.value || 5) / 2;
+    raw += val * cat.weight;
+  });
+  // Normalise: weights sum to 1.0 so raw is already correct
+  const rounded = Math.round(raw * 2) / 2;
+  const pct = Math.round((raw / 5) * 100);
+  document.getElementById('score-raw').textContent = raw.toFixed(2);
+  document.getElementById('score-rounded').textContent = rounded.toFixed(1);
+  document.getElementById('score-pct').textContent = pct + '%';
+  document.getElementById('score-label').textContent = getRatingLabel(raw);
+}
+
+function submitReview() {
+  const person = document.getElementById('rev-person').value;
+  const film = document.getElementById('rev-film-value').value || document.getElementById('rev-film-search').value;
+  const dateVal = document.getElementById('rev-date').value;
+  const notes = document.getElementById('rev-notes').value;
+
+  if (!person) { setRevStatus('Please select a reviewer.', 'var(--danger)'); return; }
+  if (!film) { setRevStatus('Please select a film.', 'var(--danger)'); return; }
+
+  const scores = {};
+  let raw = 0;
+  CATEGORIES.forEach(cat => {
+    const val = parseInt(document.getElementById('slider-' + cat.id).value) / 2;
+    scores[cat.id] = val;
+    raw += val * cat.weight;
+  });
+
+  const rounded = Math.round(raw * 2) / 2;
+  const pct = Math.round((raw / 5) * 100);
+
+  const payload = { person, film, date: dateVal, notes, scores, raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct, timestamp: new Date().toISOString() };
+
+  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
+    setRevStatus('⚠️ Google Sheets not connected yet — see setup instructions. Score: ' + raw.toFixed(2) + '/5', 'var(--accent)');
+    console.log('Review data (would be sent):', JSON.stringify(payload, null, 2));
+    return;
+  }
+
+  setRevStatus('Saving...', 'var(--muted)');
+  fetch(REVIEWS_WEBHOOK_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(() => {
+    setRevStatus('✓ Review saved!', 'var(--new)');
+    _reviewCache = null; // invalidate cache
+  }).catch(e => {
+    setRevStatus('Error saving: ' + e.message, 'var(--danger)');
+  });
+}
+
+function setRevStatus(msg, color) {
+  const el = document.getElementById('rev-status');
+  if (el) { el.textContent = msg; el.style.color = color; }
+}
+
+let _reviewCache = null;
+let _currentFilter = 'All';
+
+function setReviewFilter(filter) {
+  _currentFilter = filter;
+  document.querySelectorAll('.rev-filter-btn').forEach(btn => {
+    const isActive = btn.textContent === filter;
+    btn.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = isActive ? 'var(--bg)' : (filter === 'All' ? 'var(--muted)' : 'var(--' + btn.textContent.toLowerCase() + ')');
+    btn.style.border = isActive ? 'none' : '1px solid var(--border)';
+  });
+  renderReviewTable(_reviewCache);
+}
+
+async function loadReviews() {
+  const container = document.getElementById('rev-table-container');
+  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
+    container.innerHTML = `<div class="note-box">Google Sheets not connected yet. Once set up, reviews will appear here ranked best to worst.</div>`;
+    return;
+  }
+  if (_reviewCache) { renderReviewTable(_reviewCache); return; }
+  container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);">Loading...</div>`;
+  try {
+    const res = await fetch(REVIEWS_WEBHOOK_URL + '?action=get');
+    const data = await res.json();
+    _reviewCache = data;
+    renderReviewTable(data);
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--danger);">Failed to load reviews: ${e.message}</div>`;
+  }
+}
+
+function renderReviewTable(data) {
+  const container = document.getElementById('rev-table-container');
+  if (!data || !data.length) {
+    container.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);">No reviews yet.</div>`;
+    return;
+  }
+
+  // Filter by person
+  const filtered = _currentFilter === 'All' ? data : data.filter(r => r.person === _currentFilter);
+
+  // Group by film, compute avg/combined score
+  const byFilm = {};
+  filtered.forEach(r => {
+    if (!byFilm[r.film]) byFilm[r.film] = { reviews: [], sum: 0 };
+    byFilm[r.film].reviews.push(r);
+    byFilm[r.film].sum += parseFloat(r.raw);
+  });
+
+  const filmRankings = Object.entries(byFilm).map(([film, d]) => ({
+    film,
+    avg: d.sum / d.reviews.length,
+    reviews: d.reviews,
+    count: d.reviews.length,
+  })).sort((a, b) => b.avg - a.avg);
+
+  const personColors = { Owen: 'var(--owen)', Conor: 'var(--conor)', Alice: 'var(--alice)' };
+
+  let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">${filmRankings.length} films · ${filtered.length} reviews</div>`;
+
+  filmRankings.forEach((item, rank) => {
+    const rounded = Math.round(item.avg * 2) / 2;
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">`;
+    html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">`;
+    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
+    html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
+    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${rounded.toFixed(1)}</span>`;
+    html += `</div>`;
+    // Individual scores
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">`;
+    item.reviews.forEach(r => {
+      html += `<span style="font-size:11px;padding:3px 8px;border-radius:20px;background:var(--surface2);color:${personColors[r.person] || 'var(--muted)'};">`;
+      html += `${r.person}: ${parseFloat(r.raw).toFixed(2)}`;
+      html += `</span>`;
+    });
+    html += `</div>`;
+    if (item.count > 1) {
+      html += `<div style="font-size:11px;color:var(--muted);margin-top:4px;">Avg of ${item.count} reviews</div>`;
+    }
+    html += `</div>`;
+  });
+
+  container.innerHTML = html;
+}
 const HOME_FIXTURES = [
   // ── Wigan Warriors (Rugby League) ──
   { date: '2026-02-21', opponent: 'Hull FC', competition: 'Super League', round: 'Round 2', time: '20:00', result: 'W 34–6', sport: 'rl' },
@@ -1693,6 +2037,7 @@ buildImpossiblePage();
 buildKidsPage();
 buildMissedPage();
 buildStatsPage();
+buildReviewsPage();
 buildFixturesPage();
 </script>
 </body>
