@@ -803,6 +803,14 @@ function buildWeekPage() {
       notes.push('🕐 Owen working — films after 7:35pm only');
     }
     if (dayName === 'Thursday' && dateStr >= '2026-05-28') notes.push('🍺 Pub quiz — Conor & Owen unavailable');
+    if (typeof OMNI_STATE !== 'undefined' && OMNI_STATE.diary){
+      OMNI_STATE.diary.filter(e => e.date === dateStr).forEach(e => {
+        const who = e.person === 'ALL' ? 'Everyone' : e.person;
+        const generic = !e.reason || e.reason === 'Not available' || e.reason === 'Marked unavailable';
+        const note = `🚫 ${who} unavailable${generic ? '' : ' — ' + e.reason}`;
+        if (!notes.includes(note)) notes.push(note);
+      });
+    }
     return notes;
   }
 
@@ -3026,6 +3034,7 @@ function omniToast(msg, color){
 // ============================================================================
 function omniQuickUnavailable(dateStr){
   omniCloseUnavail();
+  const existingNote=(OMNI_STATE.diary.find(d=>d.date===dateStr && d.reason && d.reason!=='Marked unavailable' && d.reason!=='Not available')||{}).reason||'';
   const modal=document.createElement('div'); modal.id='omni-unavail-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;';
   const btns=OMNI_RULES.people.map(p=>{
@@ -3038,19 +3047,38 @@ function omniQuickUnavailable(dateStr){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">WHO'S NOT FREE?</div>
       <button onclick="omniCloseUnavail()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">&times;</button></div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">${formatFullDate(dateStr)} — tap a name to mark them unavailable (tap again to undo). The film moves to a day they can make it, and this is saved so nothing else that needs them lands here.</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">${formatFullDate(dateStr)} — tap a name to mark them unavailable (tap again to undo). The film moves to a day they can make it.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">${btns}</div>
+    <div style="margin-top:14px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Note (optional — why?)</div>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="omni-unavail-note" value="${(existingNote||'').replace(/"/g,'&quot;')}" placeholder="e.g. away for the weekend" style="flex:1;padding:8px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);">
+        <button onclick="omniUnavailNote('${dateStr}')" style="padding:8px 12px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);cursor:pointer;white-space:nowrap;">Save note</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">The note shows on that day in the calendar, like the quiz/match notes.</div>
+    </div>
     <button onclick="omniCloseUnavail()" style="margin-top:14px;width:100%;padding:10px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:700;cursor:pointer;">Done</button></div>`;
   modal.addEventListener('click',e=>{ if(e.target===modal) omniCloseUnavail(); });
   document.body.appendChild(modal);
 }
 function omniCloseUnavail(){ const m=document.getElementById('omni-unavail-modal'); if(m) m.remove(); }
 function omniToggleUnavail(dateStr, person){
+  const noteEl=document.getElementById('omni-unavail-note');
+  const note=noteEl ? noteEl.value.trim() : '';
   const i=OMNI_STATE.diary.findIndex(d=>d.date===dateStr && d.person===person);
   if (i>=0) OMNI_STATE.diary.splice(i,1);
-  else OMNI_STATE.diary.push({date:dateStr, person, reason:'Marked unavailable'});
+  else OMNI_STATE.diary.push({date:dateStr, person, reason: note || 'Marked unavailable'});
   OMNI_DIARY_PENDING=null; // this flow applies immediately; keep the diary draft in sync
   omniApply(true); omniQuickUnavailable(dateStr);
+}
+function omniUnavailNote(dateStr){
+  const note=(document.getElementById('omni-unavail-note').value||'').trim();
+  const affected=OMNI_STATE.diary.filter(d=>d.date===dateStr);
+  if(!affected.length){ omniToast('Mark someone unavailable first','var(--danger)'); return; }
+  affected.forEach(d=>{ d.reason = note || 'Marked unavailable'; });
+  OMNI_DIARY_PENDING=null;
+  omniApply(true); omniQuickUnavailable(dateStr);
+  omniToast(note?'Note saved ✓':'Note cleared','var(--new)');
 }
 
 // ============================================================================
@@ -3202,9 +3230,14 @@ function omniBuildDiaryPage(){
   html+=`<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">UPCOMING (${upcoming.length})</div><div style="display:flex;flex-direction:column;gap:8px;">`;
   if(!upcoming.length) html+=`<div class="empty-day">Nothing coming up.</div>`;
   upcoming.forEach(d=>{ const realIdx=diary.indexOf(d);
-    html+=`<div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
-      <div><span class="attendee-chip ${chipClass(d.person)}">${d.person==='ALL'?'Everyone':d.person}</span>
-        <span style="font-weight:600;margin-left:6px;">${formatFullDate(d.date)}</span>${d.reason?`<span style="color:var(--muted);margin-left:6px;">— ${d.reason}</span>`:''}</div>
+    const generic = !d.reason || d.reason==='Not available' || d.reason==='Marked unavailable';
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+        <span class="attendee-chip ${chipClass(d.person)}">${d.person==='ALL'?'Everyone':d.person}</span>
+        <span style="font-weight:600;white-space:nowrap;">${formatFullDate(d.date)}</span>
+        <input type="text" value="${(generic?'':d.reason).replace(/"/g,'&quot;')}" placeholder="add a note…" onchange="omniDiaryNote(${realIdx}, this.value)"
+          style="flex:1;min-width:80px;padding:5px 8px;border-radius:6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:12px;">
+      </div>
       <button onclick="omniRemoveDiary(${realIdx})" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:18px;">×</button></div>`; });
   html+=`</div>`;
   el.innerHTML=html;
@@ -3227,6 +3260,11 @@ function omniAddDiary(){
 function omniRemoveDiary(idx){
   if(!OMNI_DIARY_PENDING) OMNI_DIARY_PENDING=omniCloneDiary(OMNI_STATE.diary);
   OMNI_DIARY_PENDING.splice(idx,1); omniBuildDiaryPage();
+}
+function omniDiaryNote(idx, val){
+  if(!OMNI_DIARY_PENDING) OMNI_DIARY_PENDING=omniCloneDiary(OMNI_STATE.diary);
+  if(OMNI_DIARY_PENDING[idx]) OMNI_DIARY_PENDING[idx].reason = (val||'').trim() || 'Not available';
+  omniBuildDiaryPage();
 }
 
 // ============================================================================
@@ -3351,11 +3389,73 @@ function omniOpenLock(title){
   document.body.appendChild(modal);
 }
 function omniCloseLock(){ const m=document.getElementById('omni-lock-modal'); if(m) m.remove(); }
+
+// Who can't attend this specific showing, and why.
+function omniWhyUnavailable(showing){
+  const r=showing.reasons||[];
+  if(showing.blocked){
+    if(r.includes('home_match_day')) return [{person:'Everyone', reason:'Warriors home match day — no cinema (Conor working)'}];
+    if(r.includes('pub_quiz_thursday')) return [{person:'Everyone', reason:'pub quiz night — Conor & Owen out'}];
+    if(r.includes('sunday_too_early')) return [{person:'Everyone', reason:'Sunday before 3pm — Owen working'}];
+    if(r.includes('all_unavailable')){
+      const di=OMNI_STATE.diary.find(d=>d.date===showing.date && d.person==='ALL');
+      const generic=!di||!di.reason||di.reason==='Not available'||di.reason==='Marked unavailable';
+      return [{person:'Everyone', reason: generic?'marked unavailable in the diary':di.reason}];
+    }
+  }
+  const dayName=omniDayName(showing.date); const out=[];
+  OMNI_RULES.people.forEach(p=>{
+    if((showing.attendees||[]).includes(p)) return;
+    let reason='not available';
+    const di=OMNI_STATE.diary.find(d=>d.date===showing.date && (d.person===p||d.person==='ALL'));
+    if(di){
+      const generic=!di.reason||di.reason==='Not available'||di.reason==='Marked unavailable';
+      reason = di.person==='ALL' ? (generic?'everyone marked unavailable in the diary':di.reason)
+                                 : (generic?'marked unavailable in the diary':di.reason);
+    } else if(p==='Conor' && OMNI_RULES.homeGameDates.has(showing.date)){ reason='Warriors home game'; }
+    else if(dayName==='Thursday' && showing.date>=OMNI_RULES.pubQuizFrom && (p==='Conor'||p==='Owen')){ reason='pub quiz night'; }
+    else if(p==='Owen'){
+      if(dayName==='Sunday') reason='works Sundays until 3pm';
+      else if(!['Saturday','Sunday'].includes(dayName) && !OMNI_RULES.bankHolidays.has(showing.date)) reason='works until 7:35pm';
+    }
+    out.push({person:p, reason});
+  });
+  return out;
+}
+
+// Small styled confirm dialog.
+function omniConfirm(title, bodyHtml, onYes, yesLabel){
+  const m=document.createElement('div'); m.id='omni-confirm';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  m.innerHTML=`<div style="background:var(--surface);border:1px solid var(--danger);border-radius:14px;max-width:420px;width:100%;padding:18px;">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--danger);margin-bottom:10px;">${title}</div>
+    <div style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.5;">${bodyHtml}</div>
+    <div style="display:flex;gap:8px;">
+      <button id="omni-confirm-no" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);cursor:pointer;font-weight:700;">Cancel</button>
+      <button id="omni-confirm-yes" style="flex:1;padding:10px;border-radius:8px;background:var(--danger);color:#fff;border:none;cursor:pointer;font-weight:800;">${yesLabel||'Continue anyway'}</button>
+    </div></div>`;
+  m.addEventListener('click',e=>{ if(e.target===m) m.remove(); });
+  document.body.appendChild(m);
+  m.querySelector('#omni-confirm-no').onclick=()=>m.remove();
+  m.querySelector('#omni-confirm-yes').onclick=()=>{ m.remove(); onYes(); };
+}
+
 function omniApplyLock(enc){ const title=decodeURIComponent(enc); const sel=document.querySelector('input[name="lock-choice"]:checked');
   if(!sel){ omniToast('Choose a screening','var(--danger)'); return; }
   const [date,start,screen]=sel.value.split('|');
-  OMNI_STATE.locks=OMNI_STATE.locks.filter(l=>l.title!==title); OMNI_STATE.locks.push({title,date,start,screen});
-  omniCloseLock(); omniApply(true); omniToast('Locked ✓','var(--new)'); }
+  const commit=()=>{ OMNI_STATE.locks=OMNI_STATE.locks.filter(l=>l.title!==title); OMNI_STATE.locks.push({title,date,start,screen});
+    omniCloseLock(); omniApply(true); omniToast('Locked ✓','var(--new)'); };
+  // check availability for the chosen showing
+  const film=DATA.all_films.find(f=>f.title===title)||DATA.schedule.find(f=>f.title===title);
+  const s=film && (film.showings||[]).find(x=>x.date===date && x.start===start && (!screen||x.screen===screen));
+  const missing = s ? omniWhyUnavailable(s) : [];
+  if(missing.length){
+    const list=missing.map(x=>`<div style="margin:4px 0;"><span class="attendee-chip ${chipClass(x.person)}">${x.person}</span> <span style="color:var(--muted);">— ${x.reason}</span></div>`).join('');
+    omniConfirm('HEADS UP',
+      `You're locking <b>${film.title}</b> to <b>${formatFullDate(date)} · ${start}</b>, but ${missing.length===1?'someone':'some people'} can't make it:${list}<div style="margin-top:10px;">Lock it in anyway?</div>`,
+      commit, 'Lock anyway');
+  } else commit();
+}
 function omniClearLock(enc){ const title=decodeURIComponent(enc);
   OMNI_STATE.locks=OMNI_STATE.locks.filter(l=>l.title!==title); omniCloseLock(); omniApply(true); omniToast('Unlocked','var(--muted)'); }
 
