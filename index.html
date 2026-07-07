@@ -2912,7 +2912,12 @@ function omniBuildData(){
 
   const schedule = Object.keys(decided).map(title => {
     const f = candByTitle[title]; const d = decided[title];
-    const e = Object.assign({}, f, { showing: d.showing });
+    // Always recompute availability from the hardcoded rules for whatever showing
+    // ended up chosen (sticky, locked, or fresh) — never trust stored attendees.
+    const fresh = omniAnnotate({ date:d.showing.date, date_human:d.showing.date_human,
+      start:d.showing.start, end:d.showing.end, screen:d.showing.screen, url:d.showing.url,
+      is_maxx:d.showing.is_maxx, is_estimated:d.showing.is_estimated });
+    const e = Object.assign({}, f, { showing: fresh });
     if (d.locked) e.fixed_date = true;
     return e;
   }).sort((a,b)=> a.showing.date<b.showing.date?-1:a.showing.date>b.showing.date?1:
