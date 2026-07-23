@@ -2711,7 +2711,14 @@ const OMNI_RULES = {
     '2026-02-28','2026-03-14','2026-03-21','2026-04-11','2026-04-18',
   ]),
   bankHolidays: new Set(['2026-05-25']),
+  requireAllCanWatch: true,   // HARDCODED: only schedule a film at a time all three can attend
 };
+
+// A showing counts as schedulable only if the whole group can make it (unless relaxed).
+function omniSchedulable(s){
+  if (s.blocked) return false;
+  return OMNI_RULES.requireAllCanWatch ? !!s.all_can_watch : s.attendees.length > 0;
+}
 
 // Persistent, shared via the Sheet.
 let OMNI_STATE = {
@@ -2830,7 +2837,7 @@ function omniOverlap(a, b){
 }
 
 function omniPickBest(showings, taken){
-  const opts = showings.filter(s => !s.blocked && s.attendees.length > 0 && !taken.some(t => omniOverlap(t, s)));
+  const opts = showings.filter(s => omniSchedulable(s) && !taken.some(t => omniOverlap(t, s)));
   if (!opts.length) return null;
   opts.sort((a,b) =>
     (b.all_can_watch - a.all_can_watch) ||
@@ -2864,7 +2871,7 @@ function omniBuildData(){
       title:f.title, is_rerelease:f.is_rerelease, rating:f.rating, genres:f.genres,
       info_url:f.info_url, is_horror:(f.genres||[]).some(g=>/horror/i.test(g)),
       is_estimated: annotated.length>0 && annotated.every(s=>s.is_estimated),
-      showings: annotated, watchable_count: annotated.filter(s=>!s.blocked && s.attendees.length>0).length,
+      showings: annotated, watchable_count: annotated.filter(omniSchedulable).length,
     });
   }
   const candByTitle = {}; candidates.forEach(f => candByTitle[f.title] = f);
@@ -2893,7 +2900,7 @@ function omniBuildData(){
   for (const f of stickyOrder){
     const prev = commitByTitle[f.title].showing;
     const s = findShowing(f, prev);
-    const stillGood = s && !s.blocked && s.attendees.length>0 &&
+    const stillGood = s && omniSchedulable(s) &&
       (prev.attendees||[]).every(p => s.attendees.includes(p)) &&   // attendee set didn't shrink
       !taken.some(t => omniOverlap(t, s));
     if (stillGood){ decided[f.title] = { showing:s, locked:false }; taken.push(s); }
