@@ -3,29 +3,41 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>🎬 Omniplex Wigan — Film Schedule</title>
+<title>Omniplex Wigan — Film Schedule</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   /* Fallback stack ensures readable text even if Google Fonts is unavailable */
 
   :root {
-    --bg: #0d0d0f;
-    --surface: #16171a;
-    --surface2: #1e2024;
-    --border: #2a2d34;
-    --accent: #e8c45a;
-    --accent2: #e06a3f;
-    --new: #4ade80;
-    --rerelease: #60a5fa;
-    --text: #e8e9ec;
-    --muted: #7a7d88;
-    --danger: #f87171;
-    --owen: #a78bfa;
-    --conor: #34d399;
-    --alice: #f472b6;
+    /* LATE SHOW — auditorium ink, projector amber, coral spill */
+    --bg: #0A0D16;          /* ink    — auditorium dark, blue-violet bias */
+    --surface: #131828;     /* row    — seat-row slate */
+    --surface2: #1B2236;    /* riser  — raised panel */
+    --border: #262E42;
+    --accent: #FFD447;      /* beam   — projector yellow, the motif */
+    --accent2: #FF8A5B;     /* spill  — warm coral, premium & events only */
+    --new: #46E3A5;         /* mint   — confirmed */
+    --rerelease: #7FB2FF;
+    --text: #EDF0F8;
+    --muted: #8A93AB;
+    --danger: #FF6B6B;
+    --owen: #9B8CFF;
+    --conor: #3FD9A4;
+    --alice: #FF7EB6;
+
+    /* derived */
+    --beam-glow: rgba(255,212,71,0.10);
+    --ring: rgba(255,212,71,0.55);
+    --radius: 11px;
+    --radius-sm: 7px;
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.30);
+    --shadow-2: 0 4px 16px -8px rgba(0,0,0,0.60);
+    --display: 'Archivo', sans-serif;
+    --body: 'DM Sans', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -49,7 +61,7 @@
     z-index: 100;
   }
   .top-bar h1 {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 22px;
     letter-spacing: 2px;
     color: var(--accent);
@@ -97,7 +109,7 @@
     margin-bottom: 16px;
   }
   .week-header h2 {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 28px;
     letter-spacing: 2px;
     color: var(--accent);
@@ -124,7 +136,7 @@
     background: var(--surface);
   }
   .day-header .day-name {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 18px;
     letter-spacing: 1px;
     color: var(--muted);
@@ -193,8 +205,6 @@
     flex-shrink: 0;
     margin-top: 2px;
   }
-  .badge-new { background: rgba(74,222,128,0.15); color: var(--new); }
-  .badge-rerelease { background: rgba(96,165,250,0.15); color: var(--rerelease); }
   .badge-event { background: rgba(232,196,90,0.15); color: var(--accent); }
   .badge-maxx { background: rgba(239,68,68,0.15); color: #ef4444; }
 
@@ -239,7 +249,7 @@
     flex-wrap: wrap;
   }
   .film-time {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 20px;
     letter-spacing: 1px;
     color: var(--accent);
@@ -294,7 +304,7 @@
 
   /* SECTION HEADERS */
   .section-title {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 20px;
     letter-spacing: 2px;
     color: var(--accent);
@@ -426,7 +436,7 @@
   .showing-row:last-child { border-bottom: none; }
   .showing-row.blocked { opacity: 0.4; }
   .showing-time {
-    font-family: 'Bebas Neue', sans-serif;
+    font-family: 'Archivo', sans-serif;
     font-size: 18px;
     letter-spacing: 1px;
     color: var(--accent);
@@ -525,16 +535,260 @@
     margin-bottom: 12px;
     line-height: 1.5;
   }
+
+  /* ==========================================================================
+     LATE SHOW — 2026 refresh layer
+     Appended so nothing above is edited in place. Visual only.
+     ========================================================================== */
+
+  body {
+    font-family: var(--body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: 0.1px;
+    /* signature: light spilling from behind the header, like a projector beam */
+    background-image:
+      radial-gradient(90% 380px at 50% -140px, var(--beam-glow), transparent 70%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  ::selection { background: var(--ring); color: #0A0D16; }
+
+  /* quality floor: keyboard focus you can actually see */
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* --- TYPE ---------------------------------------------------------------- */
+  .week-header h2, .section-title {
+    font-family: var(--display);
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+  }
+  .week-header h2 { font-size: 25px; line-height: 1; }
+  .week-header .subtitle { color: var(--muted); font-size: 12.5px; letter-spacing: 0.2px; }
+  .section-title { font-size: 17px; letter-spacing: 1.8px; }
+
+  /* Signature: showtimes are data — set them like a listings board. */
+  .film-time, .showing-time, .film-end, .showing-date, .date-chip,
+  .count-chip, .section-count, .film-screen {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  .film-time {
+    font-size: 18px; font-weight: 600; letter-spacing: -0.4px;
+    color: var(--accent);
+  }
+  .showing-time { font-size: 13px; font-weight: 600; letter-spacing: -0.3px; }
+  .film-end, .showing-date { font-size: 11.5px; letter-spacing: -0.2px; }
+  .film-screen { font-size: 11px; letter-spacing: 0; color: var(--muted); }
+  .film-name { font-weight: 600; letter-spacing: -0.15px; font-size: 15.5px; }
+
+  /* --- NAV ---------------------------------------------------------------- */
+  .top-bar {
+    background: rgba(19,24,40,0.82);
+    backdrop-filter: saturate(150%) blur(14px);
+    -webkit-backdrop-filter: saturate(150%) blur(14px);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-1);
+  }
+  /* hairline beam under the nav */
+  .top-bar::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5; pointer-events: none;
+  }
+
+  .tab {
+    font-family: var(--body);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    border-bottom: none !important;
+    border-radius: 999px;
+    padding: 7px 13px;
+    transition: color .14s ease, background .14s ease;
+  }
+  .tab.active {
+    color: #0A0D16;
+    background: var(--accent);
+    border-bottom-color: transparent;
+  }
+  .tab:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.05); }
+
+  /* --- SURFACES ----------------------------------------------------------- */
+  .day-block {
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+    transition: box-shadow .16s ease, transform .16s ease;
+  }
+  .day-block.has-film {
+    border-color: rgba(255,212,71,0.32);
+    box-shadow: var(--shadow-2), inset 3px 0 0 var(--accent);
+  }
+  .day-block:hover { box-shadow: var(--shadow-2); }
+  .day-block.has-film:hover { transform: translateY(-1px); }
+
+  .film-card { background: transparent; padding: 13px 15px; }
+  .film-card + .film-card { border-top: 1px solid var(--border); }
+
+  .future-film-card, .impossible-card, .kids-card, .rules-card,
+  .note-box, .empty-day, .film-group, .search-box {
+    border-radius: var(--radius);
+  }
+  .future-film-card, .impossible-card, .kids-card, .film-group {
+    box-shadow: var(--shadow-1);
+    transition: box-shadow .16s ease, border-color .16s ease;
+  }
+  .future-film-card:hover, .impossible-card:hover, .film-group:hover {
+    box-shadow: var(--shadow-2);
+    border-color: #33405C;
+  }
+  .empty-day { color: var(--muted); }
+
+  /* --- CHIPS, BADGES, BUTTONS --------------------------------------------- */
+  .attendee-chip {
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+    padding: 3px 9px;
+  }
+  .chip-owen  { background: rgba(155,140,255,0.16); color: var(--owen);  box-shadow: inset 0 0 0 1px rgba(155,140,255,0.28); }
+  .chip-conor { background: rgba(63,217,164,0.16);  color: var(--conor); box-shadow: inset 0 0 0 1px rgba(63,217,164,0.28); }
+  .chip-alice { background: rgba(255,126,182,0.16); color: var(--alice); box-shadow: inset 0 0 0 1px rgba(255,126,182,0.28); }
+
+  .date-chip, .count-chip, .genre-chip {
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .badge-maxx, .badge-event,
+  .film-type-badge, .reason-badge, .rating-badge {
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .badge-maxx { background: rgba(255,90,90,0.15); color: #FF5A5A;
+    box-shadow: inset 0 0 0 1px rgba(255,90,90,0.26); }
+  .badge-event { background: rgba(127,178,255,0.15); color: var(--rerelease); }
+
+  .book-btn {
+    font-family: var(--body);
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 10px -3px rgba(255,212,71,0.40);
+    transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  }
+  .book-btn:hover { transform: translateY(-1px); filter: brightness(1.06);
+    box-shadow: 0 5px 16px -4px rgba(255,212,71,0.55); }
+  .book-btn:active { transform: translateY(0); }
+
+  .avail-btn, .search-box {
+    border-radius: var(--radius-sm);
+    transition: border-color .14s ease, background .14s ease;
+  }
+  .search-box:focus { border-color: var(--accent); }
+
+  /* --- SCROLLBAR ---------------------------------------------------------- */
+  * { scrollbar-width: thin; scrollbar-color: #2E3850 transparent; }
+  *::-webkit-scrollbar { width: 9px; height: 9px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb { background: #2E3850; border-radius: 999px; border: 2px solid var(--bg); }
+  *::-webkit-scrollbar-thumb:hover { background: #3C486A; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .day-block.has-film:hover, .book-btn:hover { transform: none; }
+  }
+
+
+  /* --- SYMBOLS (own set; no emoji) ---------------------------------------- */
+  .logomark {
+    width: 21px; height: 21px; flex: 0 0 auto;
+    color: var(--accent); vertical-align: -4px; margin-right: 9px;
+  }
+  .ic {
+    width: 12px; height: 12px; vertical-align: -1.5px;
+    margin-right: 5px; flex: 0 0 auto;
+  }
+  /* uppercase micro-label — replaces every pictogram that carried meaning */
+  .ntag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(255,212,71,0.10);
+    border: 1px solid rgba(255,212,71,0.22);
+    border-radius: 4px;
+    padding: 1px 5px 0;
+    margin-right: 7px;
+    vertical-align: 1px;
+    line-height: 1.5;
+  }
+  .kids-card .ntag, .film-group .ntag { margin-right: 9px; }
+  /* film-booked marker in the diary grid */
+  .film-mark {
+    display: inline-block; width: 5px; height: 5px;
+    background: var(--accent); border-radius: 1px;
+  }
+
+  /* --- TIGHTEN ------------------------------------------------------------ */
+  body { font-size: 13.5px; letter-spacing: 0; }
+  .week-header { margin-bottom: 13px; gap: 9px; }
+  .week-header h2 { font-size: 22px; letter-spacing: 0.5px; }
+  .section-title { font-size: 15px; letter-spacing: 1px; margin-bottom: 10px; }
+  .page { padding: 14px; }
+
+  .top-bar { padding: 11px 14px 0; }
+  h1 { display: flex; align-items: center; letter-spacing: 0.4px; }
+  .tab { font-size: 10.5px; letter-spacing: 0.4px; padding: 6px 11px; }
+
+  .day-block { margin-bottom: 9px; }
+  .day-block.has-film { box-shadow: var(--shadow-2), inset 2px 0 0 var(--accent); }
+  .film-card { padding: 11px 13px; }
+  .film-time { font-size: 17px; }
+  .film-name { font-size: 15px; }
+  .attendee-chip { font-size: 10px; padding: 2.5px 8px; letter-spacing: 0.2px; }
+  .book-btn { box-shadow: none; padding: 6px 13px; font-size: 11.5px; }
+  .book-btn:hover { box-shadow: 0 3px 12px -4px rgba(255,212,71,0.5); }
+  .date-chip, .count-chip, .genre-chip { font-size: 10.5px; padding: 2.5px 8px; }
+
 </style>
 </head>
 <body>
 
 <div class="top-bar">
-  <h1>🎬 OMNIPLEX <span>WIGAN</span></h1>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="ic-frame" viewBox="0 0 24 24">
+    <rect x="2.4" y="4.6" width="19.2" height="14.8" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M6.1 8.3v7.4M17.9 8.3v7.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ic-lock" viewBox="0 0 24 24">
+    <rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.9"/>
+    <path d="M8.3 10.4V7.9a3.7 3.7 0 0 1 7.4 0v2.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ic-unlock" viewBox="0 0 24 24">
+    <rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.9"/>
+    <path d="M8.3 10.4V7.9a3.7 3.7 0 0 1 7.1-1.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+  </symbol>
+</defs></svg>
+<h1><svg class="logomark" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-frame"/></svg>OMNIPLEX <span>WIGAN</span></h1>
   <div class="tab-row">
     <button class="tab active" onclick="showPage('week')">Calendar</button>
-    <button class="tab" onclick="showPage('diary')">📅 Diary</button>
-    <button class="tab" onclick="showPage('data')">⬆️ Data</button>
+    <button class="tab" onclick="showPage('diary')">Diary</button>
+    <button class="tab" onclick="showPage('data')">Data</button>
     <button class="tab" onclick="showPage('future')">Coming Up</button>
     <button class="tab" onclick="showPage('screenings')">All Screenings</button>
     <button class="tab" onclick="showPage('impossible')">Can't Watch</button>
@@ -543,8 +797,8 @@
     <button class="tab" onclick="showPage('missed')">Missed</button>
     <button class="tab" onclick="showPage('stats')">Stats</button>
     <button class="tab" onclick="showPage('reviews')">Reviews</button>
-    <button class="tab" onclick="openFoodAndDrink()">🍿 Food & Drink</button>
-    <button class="tab" onclick="showPage('fixtures')">🏉 Fixtures</button>
+    <button class="tab" onclick="openFoodAndDrink()">Food &amp; Drink</button>
+    <button class="tab" onclick="showPage('fixtures')">Fixtures</button>
   </div>
 </div>
 
@@ -624,14 +878,13 @@ function typeBadge(title, isRerelease, isMaxx, isEstimated) {
   const maxxBadge = isMaxx ? `<span class="film-type-badge badge-maxx">MAXX</span>` : '';
   const estBadge = isEstimated ? `<span class="film-type-badge" style="background:rgba(251,146,60,0.15);color:#fb923c;border:1px solid rgba(251,146,60,0.3);">~EST</span>` : '';
   if (title.includes('Cup') || title.includes('Semi-Final')) return `${maxxBadge}${estBadge}<span class="film-type-badge badge-event">EVENT</span>`;
-  if (isRerelease) return `${maxxBadge}${estBadge}<span class="film-type-badge badge-rerelease">RE-RELEASE</span>`;
-  return `${maxxBadge}${estBadge}<span class="film-type-badge badge-new">NEW</span>`;
+  return `${maxxBadge}${estBadge}`;
 }
 
 function reasonLabel(r) {
-  if (r === 'pub_quiz_thursday') return '🍺 Pub Quiz Thursday';
-  if (r === 'sunday_too_early') return '🌅 Sunday — before 3pm';
-  if (r === 'all_unavailable') return '❌ Everyone unavailable';
+  if (r === 'pub_quiz_thursday') return 'Pub quiz — Thursday';
+  if (r === 'sunday_too_early') return 'Sunday — before 3pm';
+  if (r === 'all_unavailable') return 'Everyone unavailable';
   return r;
 }
 
@@ -686,10 +939,6 @@ function buildWeekPage() {
     <div class="week-header">
       <h2>CALENDAR</h2>
       <span class="subtitle">${DATA.schedule.length} films scheduled</span>
-    </div>
-    <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:var(--new)"></div> New Film</div>
-      <div class="legend-item"><div class="legend-dot" style="background:var(--rerelease)"></div> Re-release</div>
     </div>
   `;
 
@@ -759,55 +1008,62 @@ function buildWeekPage() {
   const BANK_HOLIDAYS_RELAXED = new Set(['2026-05-25']);
 
   const dayNotes = {
-    '2026-05-07': ['🎤 Baby No Money gig — Conor & Alice unavailable'],
-    '2026-05-09': ['🎤 Mr Gey Gig — Conor & Alice unavailable'],
-    '2026-05-10': ['❌ Everyone unavailable'],
-    '2026-05-11': ['🎤 Maisie Peters gig — Conor & Alice unavailable'],
-    '2026-05-12': ['🎉 Eurovision — everyone unavailable'],
-    '2026-05-13': ['❌ No films today'],
-    '2026-05-14': ['🎉 Eurovision — everyone unavailable'],
-    '2026-05-15': ['🏉 Warriors vs Leeds Rhinos (home — no cinema)', '🍻 Owen at work drinks'],
-    '2026-05-16': ['🎉 Eurovision — everyone unavailable'],
-    '2026-05-18': ['🎾 Tennis — everyone unavailable'],
-    '2026-05-19': ['⚠️ Owen unavailable (seeing Sam)'],
-    '2026-05-21': ['🚂 Owen in London'],
-    '2026-05-25': ["🏖️ Bank holiday — Owen's normal time constraints relaxed"],
-    '2026-05-27': ['🚂 Alice in London'],
-    '2026-05-29': ['🎤 Gig — Conor & Alice unavailable'],
-    '2026-06-13': ['🎵 Clog Men gig — everyone unavailable'],
-    '2026-06-19': ['🗳️ By-election day after — Owen unavailable'],
-    '2026-06-20': ['🚗 Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-21': ['🚗 Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-22': ['🚗 Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-23': ['🚗 Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-28': ['🎭 Dark Room Man — everyone unavailable'],
-    '2026-06-29': ['🎬 Supergirl with Lucy (📌 locked)'],
-    '2026-07-21': ['⚠️ Conor unavailable'],
-    '2026-08-26': ['🌊 Wales trip — everyone unavailable'],
-    '2026-08-27': ['🌊 Wales trip — everyone unavailable'],
-    '2026-08-28': ['🌊 Wales trip — everyone unavailable'],
-    '2026-08-29': ['🌊 Wales trip — everyone unavailable'],
-    '2026-08-30': ['🌊 Wales trip — everyone unavailable'],
-    '2026-08-31': ['🌊 Wales trip — everyone unavailable'],
-    '2026-09-01': ['🌊 Wales trip — everyone unavailable'],
+    '2026-05-07': ['<span class=ntag>GIG</span>Baby No Money gig — Conor & Alice unavailable'],
+    '2026-05-09': ['<span class=ntag>GIG</span>Mr Gey Gig — Conor & Alice unavailable'],
+    '2026-05-10': ['<span class=ntag>NONE</span>Everyone unavailable'],
+    '2026-05-11': ['<span class=ntag>GIG</span>Maisie Peters gig — Conor & Alice unavailable'],
+    '2026-05-12': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
+    '2026-05-13': ['<span class=ntag>NONE</span>No films today'],
+    '2026-05-14': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
+    '2026-05-15': ['<span class=ntag>MATCH</span>Warriors vs Leeds Rhinos (home — no cinema)', '<span class=ntag>DRINKS</span>Owen at work drinks'],
+    '2026-05-16': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
+    '2026-05-18': ['<span class=ntag>EVENT</span>Tennis — everyone unavailable'],
+    '2026-05-19': ['<span class=ntag>OFF</span>Owen unavailable (seeing Sam)'],
+    '2026-05-21': ['<span class=ntag>TRAVEL</span>Owen in London'],
+    '2026-05-25': ["<span class=ntag>HOLIDAY</span>Bank holiday — Owen's normal time constraints relaxed"],
+    '2026-05-27': ['<span class=ntag>TRAVEL</span>Alice in London'],
+    '2026-05-29': ['<span class=ntag>GIG</span>Gig — Conor & Alice unavailable'],
+    '2026-06-13': ['<span class=ntag>GIG</span>Clog Men gig — everyone unavailable'],
+    '2026-06-19': ['<span class=ntag>WORK</span>By-election day after — Owen unavailable'],
+    '2026-06-20': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
+    '2026-06-21': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
+    '2026-06-22': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
+    '2026-06-23': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
+    '2026-06-28': ['<span class=ntag>SHOW</span>Dark Room Man — everyone unavailable'],
+    '2026-06-29': ['<span class=ntag>FILM</span>Supergirl with Lucy (locked)'],
+    '2026-07-21': ['<span class=ntag>OFF</span>Conor unavailable'],
+    '2026-08-26': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-08-27': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-08-28': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-08-29': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-08-30': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-08-31': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
+    '2026-09-01': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
   };
 
   function getDayNotes(dateStr, dayName) {
     const notes = [...(dayNotes[dateStr] || [])];
     if (HOME_GAME_DATES.has(dateStr) && !notes.some(n => n.includes('no cinema'))) {
-      notes.unshift('🏟️ Home match day — no cinema (Conor working)');
+      notes.unshift('<span class=ntag>MATCH</span>Home match day — no cinema (Conor working)');
     }
     const isBankHoliday = BANK_HOLIDAYS_RELAXED.has(dateStr);
-    if (dayName === 'Sunday') notes.push('🕐 Owen working — films after 3pm only');
+    if (dayName === 'Sunday') notes.push('Owen working — films after 3pm only');
     else if (['Monday','Tuesday','Wednesday','Thursday','Friday'].includes(dayName) && !isBankHoliday) {
-      notes.push('🕐 Owen working — films after 7:35pm only');
+      notes.push('Owen working — films after 7:35pm only');
     }
-    if (dayName === 'Thursday' && dateStr >= '2026-05-28') notes.push('🍺 Pub quiz — Conor & Owen unavailable');
+    if (dayName === 'Thursday' && dateStr >= '2026-05-28') notes.push('<span class=ntag>QUIZ</span>Pub quiz — Conor & Owen unavailable');
+    if (typeof omniMatchDay === 'function'){
+      const mf = omniMatchDay(dateStr, 'Conor');
+      if (mf){
+        const n = omniMatchDayLabel(mf) + ' — Conor working';
+        if (!notes.some(x => x.indexOf('at home') !== -1)) notes.push(n);
+      }
+    }
     if (typeof OMNI_STATE !== 'undefined' && OMNI_STATE.diary){
       OMNI_STATE.diary.filter(e => e.date === dateStr).forEach(e => {
         const who = e.person === 'ALL' ? 'Everyone' : e.person;
         const generic = !e.reason || e.reason === 'Not available' || e.reason === 'Marked unavailable';
-        const note = `🚫 ${who} unavailable${generic ? '' : ' — ' + e.reason}`;
+        const note = `<span class=ntag>OFF</span>${who} unavailable${generic ? '' : ' — ' + e.reason}`;
         if (!notes.includes(note)) notes.push(note);
       });
     }
@@ -827,7 +1083,7 @@ function buildWeekPage() {
     const month = d.getMonth();
     if (month !== currentMonth) {
       currentMonth = month;
-      html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
+      html += `<div style="font-family:'Archivo',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
     }
 
     html += `<div class="day-block ${hasFilm ? 'has-film' : ''}">`;
@@ -867,7 +1123,7 @@ function buildWeekPage() {
         html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">${typeBadge(f.title, f.is_rerelease, s.is_maxx, f.is_estimated)}${ratingBadge(f.rating)}</div>`;
         html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
         html += `<div class="film-name">${f.title}</div>`;
-        html += `<button onclick="omniOpenLock(\`${f.title.replace(/\`/g,'')}\`)" title="Lock / move this film" style="background:none;border:1px solid var(--border);border-radius:6px;color:${f.fixed_date?'var(--accent)':'var(--muted)'};font-size:11px;padding:2px 6px;cursor:pointer;white-space:nowrap;">${f.fixed_date?'🔒 Locked':'🔓 Lock'}</button>`;
+        html += `<button onclick="omniOpenLock(\`${f.title.replace(/\`/g,'')}\`)" title="Lock / move this film" style="background:none;border:1px solid var(--border);border-radius:6px;color:${f.fixed_date?'var(--accent)':'var(--muted)'};font-size:11px;padding:2px 6px;cursor:pointer;white-space:nowrap;">${f.fixed_date?'<svg class=ic><use href=#ic-lock/></svg>Locked':'<svg class=ic><use href=#ic-unlock/></svg>Lock'}</button>`;
         if (isActive) {
           html += `<span id="${cdId}" style="font-size:11px;font-weight:700;color:var(--danger);white-space:nowrap;font-family:monospace;"></span>`;
           html += `<span style="font-size:10px;color:var(--muted);">${cdLabel}</span>`;
@@ -877,7 +1133,7 @@ function buildWeekPage() {
         if (f.note) html += `<div style="font-size:11px;color:var(--accent);margin-top:6px;padding:5px 8px;background:rgba(232,196,90,0.1);border-radius:5px;border:1px solid rgba(232,196,90,0.2);">ℹ️ ${f.note}</div>`;
         html += `</div>`;
         html += `<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">`;
-        html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1">${s.start}</span>`;
+        html += `<span style="font-family:'Archivo',sans-serif;font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1">${s.start}</span>`;
         html += `<span style="font-size:11px;color:var(--muted);">ends ${s.end}</span>`;
         if (s.screen) html += `<span style="font-size:11px;color:var(--muted);">${s.screen}</span>`;
         if (s.url) html += `<div style="margin-top:4px;">${availBtn(s.url)}</div>`;
@@ -928,7 +1184,7 @@ function buildWeekPage() {
           }
         }
       });
-      html += `<div style="padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);display:flex;justify-content:flex-end;"><button onclick="omniQuickUnavailable('${dateStr}')" style="font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;">🚫 I'm unavailable</button></div>`;
+      html += `<div style="padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);display:flex;justify-content:flex-end;"><button onclick="omniQuickUnavailable('${dateStr}')" style="font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;">Not available</button></div>`;
       // Notes at the very bottom of the day block
       if (notes.length > 0) {
         notes.forEach(note => {
@@ -988,7 +1244,7 @@ function buildFuturePage() {
       }
       if (scheduled) {
         html += `<div style="margin-bottom:8px;padding:6px 10px;background:rgba(232,196,90,0.1);border-radius:6px;border:1px solid rgba(232,196,90,0.3);font-size:12px;color:var(--accent)">`;
-        html += `📅 Scheduled: ${formatDate(scheduled.showing.date)} at ${scheduled.showing.start}</div>`;
+        html += `Scheduled: ${formatDate(scheduled.showing.date)} at ${scheduled.showing.start}</div>`;
       }
       if (film.note) {
         html += `<div style="font-size:11px;color:var(--accent);margin-bottom:8px;padding:5px 8px;background:rgba(232,196,90,0.1);border-radius:5px;border:1px solid rgba(232,196,90,0.2);">ℹ️ ${film.note}</div>`;
@@ -1102,7 +1358,7 @@ function buildScreeningsPage() {
       const month = d.getMonth();
       if (month !== currentMonth) {
         currentMonth = month;
-        html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
+        html += `<div style="font-family:'Archivo',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);padding:14px 2px 6px;border-bottom:1px solid var(--border);margin-bottom:10px;">${monthsFull[month].toUpperCase()} ${d.getFullYear()}</div>`;
       }
       const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       const dayName = dayNames[d.getDay()];
@@ -1121,7 +1377,7 @@ function buildScreeningsPage() {
         html += `<div class="film-name">${film.title}</div>`;
         html += `</div>`;
         html += `<div style="text-align:right;flex-shrink:0;">`;
-        html += `<div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);line-height:1">${showing.start}</div>`;
+        html += `<div style="font-family:'Archivo',sans-serif;font-size:22px;color:var(--accent);line-height:1">${showing.start}</div>`;
         html += `<div style="font-size:11px;color:var(--muted);">ends ${showing.end}</div>`;
         if (showing.screen) html += `<div style="font-size:11px;color:var(--muted);">${showing.screen}</div>`;
         html += `</div></div>`;
@@ -1250,7 +1506,7 @@ function buildImpossiblePage() {
         html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;">${genreChips(film.genres)}</div>`;
       }
       html += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">`;
-      html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--accent)">${s.start}</span>`;
+      html += `<span style="font-family:'Archivo',sans-serif;font-size:18px;color:var(--accent)">${s.start}</span>`;
       html += `<span style="font-size:12px;color:var(--muted)">ends ${s.end}</span>`;
       html += `<span class="film-screen">${s.screen}</span>`;
       html += `<span style="font-size:12px;color:var(--muted)">${formatDate(s.date)}</span>`;
@@ -1313,14 +1569,14 @@ function buildKidsPage() {
   html += `<div class="note-box">These films were automatically removed as children's films. Add any to the Priority list if you'd like them scheduled.</div>`;
 
   DATA.kids_removed.forEach(title => {
-    html += `<div class="kids-card"><span class="kids-icon">🧒</span><span class="kids-name">${title}</span></div>`;
+    html += `<div class="kids-card"><span class=ntag>KIDS</span><span class="kids-name">${title}</span></div>`;
   });
 
   if (DATA.suppressed_variants && DATA.suppressed_variants.length > 0) {
     html += `<div class="section-title" style="margin-top:20px">DUPLICATE VERSIONS<span class="section-count">${DATA.suppressed_variants.length}</span></div>`;
     html += `<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">These are alternate versions of films already scheduled (3D, MAXX, etc). The standard version has been booked instead.</div>`;
     DATA.suppressed_variants.forEach(title => {
-      html += `<div class="kids-card"><span class="kids-icon">🎬</span><span class="kids-name">${title}</span></div>`;
+      html += `<div class="kids-card"><span class=ntag>FILM</span><span class="kids-name">${title}</span></div>`;
     });
   }
 
@@ -1407,9 +1663,9 @@ function buildMissedPage() {
     // Stats row
     html += `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">`;
     html += `<span style="font-size:11px;color:var(--muted);background:var(--surface2);padding:3px 8px;border-radius:5px;border:1px solid var(--border);">`;
-    html += `📅 Last showing: <strong style="color:var(--text)">${lastStr}</strong></span>`;
+    html += `Last showing: <strong style="color:var(--text)">${lastStr}</strong></span>`;
     html += `<span style="font-size:11px;color:var(--muted);background:var(--surface2);padding:3px 8px;border-radius:5px;border:1px solid var(--border);">`;
-    html += `🎬 ${film.max_screenings} screenings</span>`;
+    html += `${film.max_screenings} screenings</span>`;
     html += `</div>`;
     html += `</div>`;
   });
@@ -1456,7 +1712,7 @@ function buildStatsPage() {
 
   function statCard(value, label, sub) {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;flex:1;min-width:130px;">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;color:var(--accent);line-height:1">${value}</div>
+      <div style="font-family:'Archivo',sans-serif;font-size:36px;letter-spacing:1px;color:var(--accent);line-height:1">${value}</div>
       <div style="font-size:13px;font-weight:600;color:var(--text);margin-top:2px">${label}</div>
       ${sub ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>` : ''}
     </div>`;
@@ -1492,25 +1748,25 @@ function buildStatsPage() {
   // Records box
   html += `<div class="section-title">RECORDS</div>`;
   html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">`;
-  html += recordRow('🏆', 'Most in a single day',
+  html += recordRow('MAX', 'Most in a single day',
     `${R.most_in_day.count} films — ${fmtDate(R.most_in_day.date)}`,
     R.most_in_day.titles.join(', '));
-  html += recordRow('📅', 'Most in a single week',
+  html += recordRow('WEEK', 'Most in a single week',
     `${R.most_in_week.count} films — w/c ${fmtDate(R.most_in_week.week)}`,
     R.most_in_week.titles.join(', '));
-  html += recordRow('🗓️', 'Most in a single month',
+  html += recordRow('MONTH', 'Most in a single month',
     `${R.most_in_month.count} films — ${fmtMonth(R.most_in_month.month)}`,
     R.most_in_month.titles.slice(0,5).join(', ') + (R.most_in_month.titles.length > 5 ? ` +${R.most_in_month.titles.length-5} more` : ''));
-  html += recordRow('🔥', 'Longest streak',
+  html += recordRow('RUN', 'Longest streak',
     `${R.longest_streak.days} consecutive days`,
     `${fmtDate(R.longest_streak.from)} → ${fmtDate(R.longest_streak.to)}`);
-  html += recordRow('🏜️', 'Longest gap without a film',
+  html += recordRow('GAP', 'Longest gap without a film',
     `${R.longest_gap.days} days`,
     `${fmtDate(R.longest_gap.from)} → ${fmtDate(R.longest_gap.to)}`);
-  html += recordRow('🎬', 'Total cinema days',
+  html += recordRow('DAYS', 'Total cinema days',
     `${R.cinema_days} days`,
     `avg ${R.avg_per_cinema_day} films per visit`);
-  html += recordRow('📊', 'Weekly average',
+  html += recordRow('AVG', 'Weekly average',
     `${STATS.avg_per_active_week} films/week`,
     `on the ${STATS.weeks_active} weeks you went`);
   html += `<div style="height:1px;background:transparent;"></div>`; // remove last border
@@ -1741,7 +1997,7 @@ function buildReviewsPage() {
       <div style="font-size:11px;color:var(--muted);margin-top:1px;">${cat.desc}</div>
     </div>`;
     html += `<div style="text-align:right;flex-shrink:0;margin-left:10px;">
-      <div id="val-${cat.id}" style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">2.5</div>
+      <div id="val-${cat.id}" style="font-family:'Archivo',sans-serif;font-size:28px;color:var(--accent);line-height:1;">2.5</div>
       <div id="lbl-${cat.id}" style="font-size:10px;color:var(--muted);white-space:nowrap;">Flawed but okay</div>
     </div>`;
     html += `</div>`;
@@ -1772,9 +2028,9 @@ function buildReviewsPage() {
   html += `<div id="score-preview" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);margin-bottom:8px;">Calculated Score</div>
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;">
-      <div><span id="score-raw" style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--accent);line-height:1;">2.50</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">/5 weighted</span></div>
-      <div><span id="score-rounded" style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--text);line-height:1;">2.5</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">rounded</span></div>
-      <div><span id="score-pct" style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--text);line-height:1;">50%</span></div>
+      <div><span id="score-raw" style="font-family:'Archivo',sans-serif;font-size:40px;color:var(--accent);line-height:1;">2.50</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">/5 weighted</span></div>
+      <div><span id="score-rounded" style="font-family:'Archivo',sans-serif;font-size:32px;color:var(--text);line-height:1;">2.5</span><span style="font-size:12px;color:var(--muted);margin-left:4px;">rounded</span></div>
+      <div><span id="score-pct" style="font-family:'Archivo',sans-serif;font-size:32px;color:var(--text);line-height:1;">50%</span></div>
     </div>
     <div id="score-label" style="font-size:13px;color:var(--muted);margin-top:4px;">Flawed but okay</div>
   </div>`;
@@ -1962,7 +2218,7 @@ function submitReview() {
   const payload = { person, film, date: dateVal, notes, scores, raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct, timestamp: new Date().toISOString() };
 
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
-    setRevStatus('⚠️ Google Sheets not connected yet — see setup instructions. Score: ' + raw.toFixed(2) + '/5', 'var(--accent)');
+    setRevStatus('Google Sheets not connected yet — see setup instructions. Score: ' + raw.toFixed(2) + '/5', 'var(--accent)');
     console.log('Review data (would be sent):', JSON.stringify(payload, null, 2));
     return;
   }
@@ -1976,6 +2232,7 @@ function submitReview() {
   }).then(() => {
     setRevStatus('✓ Review saved!', 'var(--new)');
     _reviewCache = null; // invalidate cache
+    try { omniReviewSaved(payload.film); } catch(e) {}   // reviewed = watched
   }).catch(e => {
     setRevStatus('Error saving: ' + e.message, 'var(--danger)');
   });
@@ -2049,9 +2306,9 @@ function renderProfile(person, allReviews) {
     // View mode
     html += `<div id="${rowId}-view">`;
     html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);">#${i+1}</span>`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:16px;color:var(--muted);">#${i+1}</span>`;
     html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${r.film}</span>`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:${personColor};line-height:1;">${raw.toFixed(2)}</span>`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:28px;color:${personColor};line-height:1;">${raw.toFixed(2)}</span>`;
     html += `</div>`;
     if (r.date) html += `<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Watched: ${r.date}</div>`;
     if (r.notes) html += `<div style="font-size:12px;color:var(--muted);font-style:italic;margin-bottom:8px;">"${r.notes}"</div>`;
@@ -2315,9 +2572,9 @@ function renderReviewTable(data) {
     const scoreVal = sortBy === 'overall' ? item.avg : (item.catAvgs[sortBy] || 0);
     html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">`;
     html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
     html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${scoreVal.toFixed(2)}</span>`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${scoreVal.toFixed(2)}</span>`;
     html += `</div>`;
     // Per-person scores with visual line
     if (item.reviews.length > 1) {
@@ -2596,7 +2853,7 @@ function buildFixturesPage() {
     const isToday = f.date === todayStr;
     const isRL = f.sport === 'rl';
     const accentColor = isRL ? 'var(--accent2)' : '#38bdf8';
-    const sportEmoji = isRL ? '🏉' : '⚽';
+    const sportTag = isRL ? 'RL' : 'FC';
     const teamName = isRL ? 'Wigan Warriors' : 'Wigan Athletic';
 
     let borderColor = isPast ? 'var(--border)' : accentColor;
@@ -2605,14 +2862,14 @@ function buildFixturesPage() {
     let html = `<div style="background:var(--surface);border:1px solid ${borderColor};border-radius:10px;padding:12px 14px;margin-bottom:10px;">`;
 
     html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:${isPast ? 'var(--muted)' : 'var(--text)'}">`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:18px;letter-spacing:1px;color:${isPast ? 'var(--muted)' : 'var(--text)'}">`;
     html += `${formatDate(f.date)}`;
     if (isToday) html += ` <span style="font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;background:var(--danger);color:var(--bg);padding:2px 6px;border-radius:4px;margin-left:6px">TODAY</span>`;
     html += `</span>`;
-    html += `<span style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:${isPast ? 'var(--muted)' : accentColor}">${f.time}</span>`;
+    html += `<span style="font-family:'Archivo',sans-serif;font-size:20px;letter-spacing:1px;color:${isPast ? 'var(--muted)' : accentColor}">${f.time}</span>`;
     html += `</div>`;
 
-    html += `<div style="font-size:15px;font-weight:600;color:${isPast ? 'var(--muted)' : 'var(--text)'};margin-bottom:6px">${sportEmoji} ${teamName} vs ${f.opponent}</div>`;
+    html += `<div style="font-size:15px;font-weight:600;color:${isPast ? 'var(--muted)' : 'var(--text)'};margin-bottom:6px"><span class=ntag>${sportTag}</span>${teamName} vs ${f.opponent}</div>`;
 
     html += `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:${!isPast ? '8px' : '0'}">`;
     html += `<span style="font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;background:${isRL ? 'rgba(96,165,250,0.15)' : 'rgba(56,189,248,0.15)'};color:${accentColor}">${f.competition}</span>`;
@@ -2628,7 +2885,7 @@ function buildFixturesPage() {
 
     if (!isPast) {
       html += `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:6px;font-size:12px;color:var(--conor)">`;
-      html += `⚠️ Conor working — no cinema this day</div>`;
+      html += `Conor working — no cinema this day</div>`;
     }
 
     html += `</div>`;
@@ -2649,8 +2906,8 @@ function buildFixturesPage() {
   // Filter buttons
   html += `<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">`;
   html += `<button onclick="filterFixtures('all')" id="fix-all" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--accent);color:var(--bg);border:none;cursor:pointer">All (${upcoming.length})</button>`;
-  html += `<button onclick="filterFixtures('rl')" id="fix-rl" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer">🏉 Warriors (${upcomingRL.length})</button>`;
-  html += `<button onclick="filterFixtures('fc')" id="fix-fc" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer">⚽ Athletic (${upcomingFC.length})</button>`;
+  html += `<button onclick="filterFixtures('rl')" id="fix-rl" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer">Warriors (${upcomingRL.length})</button>`;
+  html += `<button onclick="filterFixtures('fc')" id="fix-fc" style="font-size:12px;font-weight:700;padding:6px 14px;border-radius:20px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);cursor:pointer">Athletic (${upcomingFC.length})</button>`;
   html += `</div>`;
 
   html += `<div id="fix-upcoming">`;
@@ -2713,6 +2970,41 @@ const OMNI_RULES = {
   bankHolidays: new Set(['2026-05-25']),
   requireAllCanWatch: true,   // HARDCODED: only schedule a film at a time all three can attend
 };
+
+// Live home fixtures pulled from the Sheet (Warriors + Athletic, kept current by
+// the daily Apps Script job). While this is empty we fall back to the hardcoded
+// dates above, so match days never silently stop blocking.
+let OMNI_FIXTURES = [];
+
+function omniFixtureBlocks(f, person){
+  const b = String(f.blocks || 'Conor');
+  return b.split(/[,;]/).map(s => s.trim()).filter(Boolean).includes(person);
+}
+// Returns the fixture that puts `person` at work on this date, or null.
+function omniMatchDay(dateStr, person){
+  person = person || 'Conor';
+  if (OMNI_FIXTURES.length){
+    for (const f of OMNI_FIXTURES){
+      if (f.date === dateStr && omniFixtureBlocks(f, person)) return f;
+    }
+    return null;   // live feed is authoritative once we have it
+  }
+  if (person === 'Conor' && OMNI_RULES.homeGameDates.has(dateStr))
+    return { date:dateStr, home:'Wigan Warriors', away:'', sport:'rl', fallback:true };
+  return null;
+}
+function omniMatchDayText(f){   // no markup — safe in title="" and textContent
+  if (!f) return 'home match day';
+  const club = f.home || 'Wigan';
+  const tag = (f.sport === 'rl') ? 'RL' : 'FC';
+  return `${tag} · ${club}${f.away ? ' v ' + f.away : ''} at home`;
+}
+function omniMatchDayLabel(f){
+  if (!f) return 'home match day';
+  const club = f.home || 'Wigan';
+  const tag = (f.sport === 'rl') ? 'RL' : 'FC';
+  return `<span class=ntag>${tag}</span>${club}${f.away ? ' v ' + f.away : ''} at home`;
+}
 
 // A showing counts as schedulable only if the whole group can make it (unless relaxed).
 function omniSchedulable(s){
@@ -2802,7 +3094,7 @@ function omniPersonFree(person, dateStr, startStr, dayName){
     if (d.date !== dateStr) continue;
     if (d.person === 'ALL' || d.person === person) return false;
   }
-  if (person === 'Conor' && OMNI_RULES.homeGameDates.has(dateStr)) return false;
+  if (omniMatchDay(dateStr, person)) return false;
   if (dayName === 'Thursday' && dateStr >= OMNI_RULES.pubQuizFrom &&
       (person === 'Conor' || person === 'Owen')) return false;
   if (person === 'Owen'){
@@ -2819,7 +3111,7 @@ function omniAnnotate(s){
   const mins = omniToMins(s.start);
   const reasons = [];
   if (dayName === 'Sunday' && mins < omniToMins(OMNI_RULES.sundayGroupCutoff)) reasons.push('sunday_too_early');
-  if (OMNI_RULES.homeGameDates.has(s.date)) reasons.push('home_match_day');
+  if (omniMatchDay(s.date, 'Conor')) reasons.push('home_match_day');
   if (dayName === 'Thursday' && s.date >= OMNI_RULES.pubQuizFrom) reasons.push('pub_quiz_thursday');
   if (OMNI_STATE.diary.some(d => d.date === s.date && d.person === 'ALL')) reasons.push('all_unavailable');
   let blocked = reasons.length > 0;
@@ -2836,14 +3128,21 @@ function omniOverlap(a, b){
   return omniToMins(a.start) < omniToMins(b.end) && omniToMins(b.start) < omniToMins(a.end);
 }
 
+// Pick the best slot. HARD PREFERENCE: one film per day — a day that already has
+// a film is only used when the film has no free day available at all.
 function omniPickBest(showings, taken){
   const opts = showings.filter(s => omniSchedulable(s) && !taken.some(t => omniOverlap(t, s)));
   if (!opts.length) return null;
-  opts.sort((a,b) =>
+  const perDay = {}; taken.forEach(t => { perDay[t.date] = (perDay[t.date]||0) + 1; });
+  const rank = (a,b) =>
     (b.all_can_watch - a.all_can_watch) ||
     (b.attendees.length - a.attendees.length) ||
     (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) ||
-    (omniToMins(b.start) - omniToMins(a.start)));
+    (omniToMins(b.start) - omniToMins(a.start));
+  const freeDays = opts.filter(s => !perDay[s.date]);
+  if (freeDays.length){ freeDays.sort(rank); return freeDays[0]; }
+  // No empty day left for this film — has to share. Use the least busy day.
+  opts.sort((a,b) => ((perDay[a.date]||0) - (perDay[b.date]||0)) || rank(a,b));
   return opts[0];
 }
 
@@ -3004,7 +3303,81 @@ async function omniLoadAll(){
     const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape')).json();
     if (Array.isArray(sc) && sc.length) OMNI_SCRAPE = sc;
   } catch(e){}
+  await omniLoadFixtures();
+  const addedFromReviews = await omniSyncReviewedWatched();
   omniConnBadge(ok);
+  return addedFromReviews;
+}
+
+// A review means it's been seen. Fold every reviewed film into the watched list
+// so it stops being scheduled. Returns how many were newly added.
+function omniNormTitle(t){ return String(t||'').split(' | ')[0].trim(); }
+async function omniSyncReviewedWatched(){
+  let reviews = null;
+  try {
+    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get')).json();
+    if (Array.isArray(r)) reviews = r;
+  } catch(e){ return 0; }
+  if (!reviews) return 0;
+  try { if (typeof _reviewCache !== 'undefined') _reviewCache = reviews; } catch(e){}
+  return omniAbsorbReviewTitles(reviews.map(r => r && r.film));
+}
+function omniAbsorbReviewTitles(titles){
+  const have = new Set(OMNI_STATE.watched.map(t => omniNormTitle(t).toLowerCase()));
+  const added = [];
+  (titles||[]).forEach(raw => {
+    const t = omniNormTitle(raw);
+    if (!t) return;
+    const key = t.toLowerCase();
+    if (have.has(key)) return;
+    have.add(key);
+    OMNI_STATE.watched.push(t);
+    added.push(t);
+  });
+  OMNI_REVIEW_ADDED = added;
+  return added.length;
+}
+let OMNI_REVIEW_ADDED = [];
+
+// Called straight after a review is saved, so the film drops out immediately.
+function omniReviewSaved(title){
+  if (omniAbsorbReviewTitles([title]) > 0){
+    omniApply(true);
+    omniToast(`“${omniNormTitle(title)}” marked as watched`,'var(--new)');
+  }
+}
+
+// Pull the live home-fixture list and mirror it into the Fixtures tab.
+async function omniLoadFixtures(){
+  try {
+    const fx = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=fixtures')).json();
+    if (Array.isArray(fx)) OMNI_FIXTURES = fx.filter(f => f && f.date);
+  } catch(e){}
+  omniSyncFixtureDisplay();
+}
+function omniSyncFixtureDisplay(){
+  if (typeof HOME_FIXTURES === 'undefined' || !OMNI_FIXTURES.length) return;
+  const mapped = OMNI_FIXTURES.map(f => ({
+    date: f.date, opponent: f.away || 'TBC', competition: f.competition || '',
+    round: f.competition || '', time: f.time || '', result: null,
+    sport: (f.sport === 'rl') ? 'rl' : 'football',
+  })).sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  HOME_FIXTURES.length = 0;              // const array, but contents are replaceable
+  mapped.forEach(m => HOME_FIXTURES.push(m));
+  try { buildFixturesPage(); } catch(e){}
+}
+
+// Ask the backend to re-scrape the fixture feeds now, then reload.
+async function omniRefreshFixtures(){
+  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
+    omniToast('Not connected to the Sheet','var(--danger)'); return; }
+  omniToast('Checking fixture feeds…','var(--accent)');
+  try {
+    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=refreshfixtures')).json();
+    await omniLoadFixtures();
+    omniApply(true);
+    omniToast(r && r.result ? String(r.result) : 'Fixtures refreshed','var(--new)');
+  } catch(e){ omniToast('Fixture refresh failed','var(--danger)'); }
 }
 
 function omniSaveState(){
@@ -3057,7 +3430,7 @@ function omniQuickUnavailable(dateStr){
   }).join('');
   modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:420px;width:100%;padding:18px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">WHO'S NOT FREE?</div>
+      <div style="font-family:'Archivo',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">WHO'S NOT FREE?</div>
       <button onclick="omniCloseUnavail()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">&times;</button></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">${formatFullDate(dateStr)} — tap a name to mark them unavailable (tap again to undo). The film moves to a day they can make it.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">${btns}</div>
@@ -3098,7 +3471,7 @@ function omniUnavailNote(dateStr){
 // ============================================================================
 let OMNI_DIARY_VIEW = { y:null, m:null, person:'Owen' };
 let OMNI_DIARY_PENDING = null;   // working copy; committed only on Save
-const OMNI_PCOLORS = { Owen:'#e8c45a', Conor:'#6ea8fe', Alice:'#f78fb2', ALL:'#f87171' };
+const OMNI_PCOLORS = { Owen:'#9B8CFF', Conor:'#3FD9A4', Alice:'#FF7EB6', ALL:'#FF6B6B' };
 const omniCloneDiary = a => a.map(o => Object.assign({}, o));
 function omniDiaryKey(o){ return o.person+'|'+o.date+'|'+(o.reason||''); }
 function omniDiaryDirty(){
@@ -3115,7 +3488,8 @@ function omniDiaryChangeCount(){
 
 function omniStructuralOff(dateStr){
   const day = omniDayName(dateStr); const out=[];
-  if (OMNI_RULES.homeGameDates.has(dateStr)) out.push({person:'Conor', reason:'Warriors home game'});
+  const mdf = omniMatchDay(dateStr, 'Conor');
+  if (mdf) out.push({person:'Conor', reason:omniMatchDayText(mdf)});
   if (day==='Thursday' && dateStr>=OMNI_RULES.pubQuizFrom){
     out.push({person:'Owen', reason:'Pub quiz'}); out.push({person:'Conor', reason:'Pub quiz'}); }
   return out;
@@ -3179,7 +3553,7 @@ function omniBuildDiaryPage(){
     ${saveBar}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
       <button onclick="omniDiaryNav(-1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px;">‹</button>
-      <div style="display:flex;align-items:center;gap:10px;"><div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;">${monthName}</div>
+      <div style="display:flex;align-items:center;gap:10px;"><div style="font-family:'Archivo',sans-serif;font-size:22px;letter-spacing:1px;">${monthName}</div>
         <button onclick="omniDiaryToday()" style="background:none;border:1px solid var(--border);color:var(--muted);font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;">Today</button></div>
       <button onclick="omniDiaryNav(1)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:16px;">›</button>
     </div>
@@ -3206,7 +3580,7 @@ function omniBuildDiaryPage(){
       const reason=one?'not available':(struct.find(e=>e.person===p)||{}).reason;
       return `<span title="${p} — ${reason}" style="width:7px;height:7px;border-radius:50%;background:${OMNI_PCOLORS[p]};opacity:${one?1:.4};display:inline-block;"></span>`;
     }).join('');
-    const film=filmDates[ds]?`<span title="${filmDates[ds]} film${filmDates[ds]>1?'s':''} booked" style="position:absolute;top:4px;right:5px;font-size:9px;">🎬</span>`:'';
+    const film=filmDates[ds]?`<span title="${filmDates[ds]} film${filmDates[ds]>1?'s':''} booked" style="position:absolute;top:4px;right:5px;"><span class=film-mark></span></span>`:'';
     const star=unsaved?`<span title="unsaved" style="position:absolute;top:3px;left:5px;color:var(--accent);font-size:12px;font-weight:800;line-height:1;">•</span>`:'';
     const fill = selOff ? 'rgba(248,113,113,.22)' : (allOff ? 'rgba(122,125,136,.18)' : 'var(--surface2)');
     const bd   = unsaved ? 'var(--accent)' : (selOff ? 'var(--danger)' : (isToday ? 'var(--accent)' : 'var(--border)'));
@@ -3220,7 +3594,7 @@ function omniBuildDiaryPage(){
     ${people.map(p=>`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:${OMNI_PCOLORS[p]};display:inline-block;"></span>${p}</span>`).join('')}
     <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:#888;opacity:.4;display:inline-block;"></span>built-in rule (quiz / match)</span>
     <span style="display:inline-flex;align-items:center;gap:4px;"><span style="color:var(--accent);font-weight:800;">•</span> unsaved</span>
-    <span>🎬 film booked</span></div>
+    <span><span class=film-mark></span> film booked</span></div>
   <div style="font-size:11px;color:var(--muted);margin-top:8px;">Changes stay unsaved (dashed) until you press <b>Save changes</b> — that's when the schedule updates and everyone else sees it. Recurring rules (Owen's hours, Thursday quiz, Warriors home games, Sunday before 3pm) are automatic and shown faded.</div></div>`;
 
   // collapsible holiday-range adder
@@ -3294,7 +3668,19 @@ function omniBuildDataPage(){
     <input type="file" id="scrape-file" accept=".json,application/json" style="font-size:12px;color:var(--text);">
     <button onclick="omniUploadScrape()" style="margin-left:8px;padding:8px 14px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:700;cursor:pointer;">Load & reschedule</button>
     <div style="font-size:11px;color:var(--muted);margin-top:8px;">Drop in <code>omniplex_wigan_showtimes.json</code>. New films are added, existing scheduled films stay put unless a showing disappears.</div></div>`;
+  // fixtures status
+  const fxCount = OMNI_FIXTURES.length;
+  const nextFx = OMNI_FIXTURES.filter(f=>f.date>=omniToday()).sort((a,b)=>a.date<b.date?-1:1)[0];
+  html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+    <div style="font-weight:700;margin-bottom:6px;">Match days (Conor)</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      ${fxCount ? `${fxCount} home fixtures loaded from the Sheet — updated daily`
+                : 'No live feed yet — using the built-in Warriors dates'}
+      ${nextFx ? ` · next: ${formatFullDate(nextFx.date)} ${omniMatchDayLabel(nextFx)}` : ''}</div>
+    <button onclick="omniRefreshFixtures()" style="padding:8px 14px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-weight:700;cursor:pointer;">↻ Check fixtures now</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;">Wigan Warriors &amp; Wigan Athletic home games at the Brick Community Stadium block Conor automatically. Add feed URLs in the <b>FixtureFeeds</b> sheet.</div></div>`;
   html+=omniListEditor('Watched (excluded)','watched',OMNI_STATE.watched);
+  if (OMNI_REVIEW_ADDED.length) html+=`<div style="font-size:11px;color:var(--muted);margin:-8px 0 14px 4px;">↳ auto-added from reviews: ${OMNI_REVIEW_ADDED.map(omniEsc).join(', ')}</div>`;
   html+=omniListEditor('Do not watch','doNotWatch',OMNI_STATE.doNotWatch);
   html+=omniListEditor('Kids removed','kidsRemoved',OMNI_STATE.kidsRemoved);
   html+=omniListEditor('Sport / event removed','sportRemoved',OMNI_STATE.sportRemoved);
@@ -3387,12 +3773,12 @@ function omniOpenLock(title){
     const who=s.attendees&&s.attendees.length?s.attendees.join(', '):(s.blocked?(s.reasons.map(reasonLabel).join('; ')||'blocked'):'—');
     return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;background:${picked?'rgba(232,196,90,.12)':'var(--surface2)'};cursor:pointer;">
       <input type="radio" name="lock-choice" value="${s.date}|${s.start}|${s.screen}" ${picked?'checked':''}>
-      <div style="flex:1;"><div style="font-weight:600;">${formatFullDate(s.date)} · ${s.start}</div><div style="font-size:11px;color:var(--muted);">${s.screen||''} · ${who}${s.blocked?' · ⚠ blocked':''}</div></div></label>`;
+      <div style="flex:1;"><div style="font-weight:600;">${formatFullDate(s.date)} · ${s.start}</div><div style="font-size:11px;color:var(--muted);">${s.screen||''} · ${who}${s.blocked?' · blocked':''}</div></div></label>`;
   }).join('');
   const modal=document.createElement('div'); modal.id='omni-lock-modal';
   modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;';
   modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:460px;width:100%;max-height:80vh;overflow:auto;padding:18px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">LOCK — ${film.title}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><div style="font-family:'Archivo',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">LOCK — ${film.title}</div>
       <button onclick="omniCloseLock()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">&times;</button></div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Pick a screening to lock this film to. Everything else reschedules around it.</div>${rows}
     <div style="display:flex;gap:8px;margin-top:14px;"><button onclick="omniApplyLock('${encodeURIComponent(title)}')" style="flex:1;padding:10px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:700;cursor:pointer;">Lock it in</button>
@@ -3406,7 +3792,8 @@ function omniCloseLock(){ const m=document.getElementById('omni-lock-modal'); if
 function omniWhyUnavailable(showing){
   const r=showing.reasons||[];
   if(showing.blocked){
-    if(r.includes('home_match_day')) return [{person:'Everyone', reason:'Warriors home match day — no cinema (Conor working)'}];
+    if(r.includes('home_match_day')){ const f=omniMatchDay(showing.date,'Conor');
+      return [{person:'Everyone', reason:omniMatchDayLabel(f)+' — Conor working'}]; }
     if(r.includes('pub_quiz_thursday')) return [{person:'Everyone', reason:'pub quiz night — Conor & Owen out'}];
     if(r.includes('sunday_too_early')) return [{person:'Everyone', reason:'Sunday before 3pm — Owen working'}];
     if(r.includes('all_unavailable')){
@@ -3424,7 +3811,7 @@ function omniWhyUnavailable(showing){
       const generic=!di.reason||di.reason==='Not available'||di.reason==='Marked unavailable';
       reason = di.person==='ALL' ? (generic?'everyone marked unavailable in the diary':di.reason)
                                  : (generic?'marked unavailable in the diary':di.reason);
-    } else if(p==='Conor' && OMNI_RULES.homeGameDates.has(showing.date)){ reason='Warriors home game'; }
+    } else if(omniMatchDay(showing.date, p)){ reason=omniMatchDayLabel(omniMatchDay(showing.date, p)); }
     else if(dayName==='Thursday' && showing.date>=OMNI_RULES.pubQuizFrom && (p==='Conor'||p==='Owen')){ reason='pub quiz night'; }
     else if(p==='Owen'){
       if(dayName==='Sunday') reason='works Sundays until 3pm';
@@ -3440,7 +3827,7 @@ function omniConfirm(title, bodyHtml, onYes, yesLabel){
   const m=document.createElement('div'); m.id='omni-confirm';
   m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
   m.innerHTML=`<div style="background:var(--surface);border:1px solid var(--danger);border-radius:14px;max-width:420px;width:100%;padding:18px;">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:var(--danger);margin-bottom:10px;">${title}</div>
+    <div style="font-family:'Archivo',sans-serif;font-size:20px;letter-spacing:1px;color:var(--danger);margin-bottom:10px;">${title}</div>
     <div style="font-size:13px;color:var(--text);margin-bottom:16px;line-height:1.5;">${bodyHtml}</div>
     <div style="display:flex;gap:8px;">
       <button id="omni-confirm-no" style="flex:1;padding:10px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);cursor:pointer;font-weight:700;">Cancel</button>
@@ -3474,7 +3861,12 @@ function omniClearLock(enc){ const title=decodeURIComponent(enc);
 // ============================================================================
 //  BOOT
 // ============================================================================
-async function omniInit(){ await omniLoadAll(); omniApply(false); }
+async function omniInit(){
+  const addedFromReviews = await omniLoadAll();
+  omniApply(addedFromReviews > 0);   // persist if reviewed films newly became watched
+  if (addedFromReviews > 0)
+    omniToast(`${addedFromReviews} reviewed film${addedFromReviews>1?'s':''} marked as watched`,'var(--new)');
+}
 
 
 // ========== INIT ==========
