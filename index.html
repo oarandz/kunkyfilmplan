@@ -764,9 +764,86 @@
   .book-btn:hover { box-shadow: 0 3px 12px -4px rgba(255,212,71,0.5); }
   .date-chip, .count-chip, .genre-chip { font-size: 10.5px; padding: 2.5px 8px; }
 
+
+  /* --- BOOT OVERLAY + SYNC PILL ------------------------------------------- */
+  #omni-boot {
+    position: fixed; inset: 0; z-index: 10050;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    transition: opacity .3s ease;
+  }
+  #omni-boot.gone { opacity: 0; pointer-events: none; }
+  .boot-card { width: 100%; max-width: 320px; text-align: left; }
+  .boot-mark { width: 34px; height: 34px; color: var(--accent); display: block; margin-bottom: 14px; }
+  .boot-title {
+    font-family: var(--display); font-weight: 800; font-size: 22px;
+    letter-spacing: 1.6px; color: var(--text); margin-bottom: 4px;
+  }
+  .boot-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+  .boot-sub::after { content: '…'; }
+  .boot-sub.done::after { content: ''; }
+  .boot-step {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12.5px; color: var(--muted); padding: 6px 0;
+  }
+  .boot-step i {
+    width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
+    background: #333B52;
+  }
+  .boot-step.run i { background: var(--accent); animation: bootPulse 1s ease-in-out infinite; }
+  .boot-step.ok  i { background: var(--new); }
+  .boot-step.ok  span { color: var(--text); }
+  .boot-step.bad i { background: var(--danger); }
+  .boot-step.bad span { color: var(--danger); }
+  .boot-step em {
+    margin-left: auto; font-family: var(--mono); font-size: 10px;
+    font-style: normal; color: var(--muted); text-align: right;
+  }
+  @keyframes bootPulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  .boot-err {
+    display: none; margin-top: 16px; padding: 10px 12px;
+    border: 1px solid var(--danger); border-radius: var(--radius-sm);
+    background: rgba(255,107,107,0.08); font-size: 11.5px; color: var(--text); line-height: 1.5;
+  }
+  .boot-err code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); word-break: break-all; }
+  .boot-skip {
+    display: none; margin-top: 14px; width: 100%; padding: 10px;
+    border-radius: var(--radius-sm); background: var(--accent); color: var(--bg);
+    border: none; font-weight: 800; font-size: 12.5px; cursor: pointer;
+  }
+
+  #omni-conn {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: var(--mono) !important; font-size: 9px !important;
+    letter-spacing: 0.6px; text-transform: uppercase;
+    border: 1px solid var(--border); cursor: pointer;
+    transition: color .15s ease, background .15s ease, border-color .15s ease;
+  }
+  #omni-conn .cdot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; }
+  #omni-conn.st-saving .cdot { animation: bootPulse .9s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .boot-step.run i, #omni-conn.st-saving .cdot { animation: none; } }
 </style>
 </head>
 <body>
+<div id="omni-boot">
+  <div class="boot-card">
+    <svg class="boot-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2.4" y="4.6" width="19.2" height="14.8" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/>
+      <path d="M6.1 8.3v7.4M17.9 8.3v7.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+    </svg>
+    <div class="boot-title">OMNISCHEDULE</div>
+    <div class="boot-sub" id="boot-sub">Connecting to the Sheet</div>
+    <div class="boot-steps">
+      <div class="boot-step" id="bs-state"><i></i><span>Shared state</span><em></em></div>
+      <div class="boot-step" id="bs-scrape"><i></i><span>Screenings log</span><em></em></div>
+      <div class="boot-step" id="bs-fixtures"><i></i><span>Match days</span><em></em></div>
+      <div class="boot-step" id="bs-reviews"><i></i><span>Reviews</span><em></em></div>
+    </div>
+    <div class="boot-err" id="boot-err"></div>
+    <button class="boot-skip" id="boot-skip" onclick="omniBootHide()">Continue offline</button>
+  </div>
+</div>
 
 <div class="top-bar">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -3284,12 +3361,18 @@ async function omniLoadAll(){
   OMNI_STATE.sportRemoved= (DATA.sport_removed||[]).slice();
   OMNI_STATE.committed   = (DATA.schedule||[]).map(omniSerialiseCommitted); // seed from embedded snapshot
 
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){ omniConnBadge(false); return; }
-  let ok = false;
+  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
+    ['state','scrape','fixtures','reviews'].forEach(k => omniBootStep(k,'skip'));
+    omniBootFail('No webhook URL is set, so nothing can sync. The app still works on this device only.');
+    omniConnBadge(false); return; }
+
+  let ok = false, stateNote = 'unreachable', stale = false;
+  omniBootStep('state','running');
   try {
-    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state')).json();
-    if (s && typeof s === 'object' && !Array.isArray(s)){
-      ok = true;
+    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
+    if (Array.isArray(s)){ stale = true; stateNote = 'out of date'; }
+    else if (s && typeof s === 'object'){
+      ok = true; stateNote = (s.committed||[]).length + ' films';
       if (Array.isArray(s.diary)) OMNI_STATE.diary = s.diary;
       if (Array.isArray(s.locks)) OMNI_STATE.locks = s.locks;
       if (Array.isArray(s.committed) && s.committed.length) OMNI_STATE.committed = s.committed;
@@ -3299,24 +3382,49 @@ async function omniLoadAll(){
       if (Array.isArray(s.sportRemoved)) OMNI_STATE.sportRemoved = s.sportRemoved;
     }
   } catch(e){}
+  omniBootStep('state', ok ? 'ok' : (stale ? 'stale' : 'fail'), stateNote);
+  let scrapeStep = { status:'fail', note:'unreachable' };
   try {
-    const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape')).json();
-    if (Array.isArray(sc) && sc.length) OMNI_SCRAPE = sc;
+    const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape&t=' + Date.now())).json();
+    if (Array.isArray(sc)){
+      const real = sc.filter(f => f && f.title && f.showings);   // reviews have neither
+      if (sc.length && !real.length) scrapeStep = { status:'stale', note:'Apps Script needs redeploying' };
+      else if (real.length){ OMNI_SCRAPE = real; scrapeStep = { status:'ok', note: real.length + ' films' }; }
+      else scrapeStep = { status:'skip', note:'nothing stored yet' };
+    }
   } catch(e){}
-  await omniLoadFixtures();
+  omniBootStep('scrape', scrapeStep.status, scrapeStep.note);
+  if (scrapeStep.status === 'stale') stale = true;
+
+  omniBootStep('fixtures','running');
+  const fxStep = await omniLoadFixtures();
+  omniBootStep('fixtures', fxStep.status, fxStep.note);
+  if (fxStep.status === 'stale') stale = true;
+
+  omniBootStep('reviews','running');
   const addedFromReviews = await omniSyncReviewedWatched();
+  omniBootStep('reviews', OMNI_REVIEW_REACHED ? 'ok' : 'fail',
+               OMNI_REVIEW_REACHED ? (addedFromReviews ? '+'+addedFromReviews+' watched' : 'up to date') : '');
+
   omniConnBadge(ok);
+  if (!ok || stale){
+    omniBootFail(stale
+      ? 'The Sheet answered, but the Apps Script running there is an <b>older version</b>, so the new endpoints are missing.<br><br>Fix: Apps Script ▸ <b>Deploy ▸ Manage deployments ▸</b> edit the Web App ▸ <b>Version: New version ▸ Deploy</b>.<br><br>Check with:<br><code>' + REVIEWS_WEBHOOK_URL + '?action=state</code>'
+      : "The Sheet didn't respond. It may be the deployment URL, sharing settings, or your connection.<br><br>Check with:<br><code>" + REVIEWS_WEBHOOK_URL + '?action=state</code>');
+  }
   return addedFromReviews;
 }
 
 // A review means it's been seen. Fold every reviewed film into the watched list
 // so it stops being scheduled. Returns how many were newly added.
 function omniNormTitle(t){ return String(t||'').split(' | ')[0].trim(); }
+let OMNI_REVIEW_REACHED = false;
 async function omniSyncReviewedWatched(){
   let reviews = null;
+  OMNI_REVIEW_REACHED = false;
   try {
-    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get')).json();
-    if (Array.isArray(r)) reviews = r;
+    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
+    if (Array.isArray(r)){ reviews = r; OMNI_REVIEW_REACHED = true; }
   } catch(e){ return 0; }
   if (!reviews) return 0;
   try { if (typeof _reviewCache !== 'undefined') _reviewCache = reviews; } catch(e){}
@@ -3401,17 +3509,27 @@ function omniUploadFixtures(){
 function omniSaveFixtures(list){
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
     omniToast('Not connected — fixtures are local only','var(--accent)'); return; }
+  omniSaveBegin();
   fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'fixtures', fixtures:list }) }).catch(()=>{});
+    body: JSON.stringify({ kind:'fixtures', fixtures:list }) }).then(omniSaveEnd).catch(omniSaveEnd);
 }
 
 // Pull the live home-fixture list and mirror it into the Fixtures tab.
 async function omniLoadFixtures(){
+  let status = 'fail', note = '';
   try {
-    const fx = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=fixtures')).json();
-    if (Array.isArray(fx)) OMNI_FIXTURES = fx.filter(f => f && f.date);
-  } catch(e){}
+    const fx = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=fixtures&t=' + Date.now())).json();
+    if (Array.isArray(fx)){
+      // An out-of-date deployment answers unknown actions with the REVIEWS list,
+      // and reviews also carry a `date` — so require a fixture-shaped row.
+      const real = fx.filter(f => f && f.date && (f.home || f.home_team || f.sport));
+      const looksLikeReviews = fx.length && !real.length;
+      if (looksLikeReviews){ status='stale'; note='Apps Script needs redeploying'; }
+      else { OMNI_FIXTURES = real; status='ok'; note = real.length + ' home games'; }
+    }
+  } catch(e){ note = 'unreachable'; }
   omniSyncFixtureDisplay();
+  return { status, note };
 }
 function omniSyncFixtureDisplay(){
   if (typeof HOME_FIXTURES === 'undefined' || !OMNI_FIXTURES.length) return;
@@ -3441,26 +3559,97 @@ async function omniRefreshFixtures(){
 function omniSaveState(){
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
     omniToast('Not connected to the Sheet — change is local only','var(--accent)'); return; }
+  omniSaveBegin();
   fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ kind:'state', diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
       committed:OMNI_STATE.committed, watched:OMNI_STATE.watched, doNotWatch:OMNI_STATE.doNotWatch,
       kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved }) })
-    .then(()=>omniToast('Saved ✓','var(--new)')).catch(()=>omniToast('Save failed','var(--danger)'));
+    .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd(); })
+    .catch(()=>{ omniToast('Save failed','var(--danger)'); omniSaveEnd(); });
 }
 function omniSaveScrape(films){
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')) return;
+  omniSaveBegin();
   fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'scrape', films }) }).catch(()=>{});
+    body: JSON.stringify({ kind:'scrape', films }) }).then(omniSaveEnd).catch(omniSaveEnd);
 }
 
-function omniConnBadge(ok){
+// ---- boot overlay -------------------------------------------------------
+function omniBootStep(key, status, note){
+  const el = document.getElementById('bs-'+key); if (!el) return;
+  el.className = 'boot-step ' + ({running:'run', ok:'ok', fail:'bad', stale:'bad', skip:''}[status] || '');
+  const em = el.querySelector('em');
+  if (em) em.textContent = note || ({running:'', ok:'ok', fail:'failed', stale:'out of date', skip:'skipped'}[status] || '');
+}
+function omniBootFail(html){
+  const e = document.getElementById('boot-err'), s = document.getElementById('boot-skip'),
+        sub = document.getElementById('boot-sub');
+  if (sub){ sub.textContent = "Couldn't reach the Sheet"; sub.classList.add('done'); }
+  if (e){ e.innerHTML = html; e.style.display = 'block'; }
+  if (s) s.style.display = 'block';
+}
+function omniBootHide(){
+  const b = document.getElementById('omni-boot'); if (!b) return;
+  b.classList.add('gone');
+  setTimeout(()=>{ if (b.parentNode) b.parentNode.removeChild(b); }, 320);
+}
+
+// ---- sync status pill ---------------------------------------------------
+let OMNI_SAVING = 0;
+let OMNI_ONLINE = false;
+const OMNI_ST = {
+  connecting: ['Connecting',  'var(--muted)', 'rgba(138,147,171,.12)'],
+  synced:     ['Synced',      'var(--new)',   'rgba(70,227,165,.13)'],
+  saving:     ['Saving',      'var(--accent)','rgba(255,212,71,.14)'],
+  unsaved:    ['Not saved',   'var(--danger)','rgba(255,107,107,.13)'],
+  offline:    ['Offline',     'var(--muted)', 'rgba(138,147,171,.12)'],
+  local:      ['Local only',  'var(--muted)', 'rgba(138,147,171,.12)'],
+};
+function omniSetStatus(key){
+  const [label, colour, bg] = OMNI_ST[key] || OMNI_ST.offline;
   let el = document.getElementById('omni-conn');
   if (!el){ el=document.createElement('div'); el.id='omni-conn';
-    el.style.cssText='position:fixed;right:10px;top:10px;z-index:9997;font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;';
+    el.style.cssText='position:fixed;right:10px;top:10px;z-index:9997;font-weight:700;padding:3px 8px;border-radius:999px;';
+    el.title = 'Tap to re-check the connection';
+    el.onclick = omniRecheck;
     document.body.appendChild(el); }
-  el.textContent = ok ? '● Sheet synced' : '○ Sheet offline';
-  el.style.background = ok ? 'rgba(74,222,128,.15)' : 'rgba(122,125,136,.15)';
-  el.style.color = ok ? 'var(--new)' : 'var(--muted)';
+  el.className = 'st-' + key;
+  el.innerHTML = '<span class="cdot" style="background:'+colour+'"></span>' + label;
+  el.style.background = bg; el.style.color = colour;
+}
+function omniConnBadge(ok){ OMNI_ONLINE = !!ok; omniSetStatus(ok ? 'synced' : 'offline'); }
+
+// POSTs are no-cors so the response is unreadable — the only honest way to know
+// a change landed is to read the state back and compare.
+let OMNI_BOOTING = true;
+async function omniVerifySync(attempt){
+  attempt = attempt || 1;
+  if (!OMNI_ONLINE) { omniSetStatus('local'); return; }
+  try {
+    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
+    if (!s || Array.isArray(s)) { omniSetStatus('offline'); return; }
+    const mine   = OMNI_STATE.committed.length+'/'+OMNI_STATE.diary.length+'/'+OMNI_STATE.locks.length;
+    const theirs = (s.committed||[]).length+'/'+(s.diary||[]).length+'/'+(s.locks||[]).length;
+    if (mine !== theirs && attempt < 3){          // give the write time to land
+      omniSetStatus('saving');
+      setTimeout(()=>omniVerifySync(attempt+1), 1600);
+      return;
+    }
+    omniSetStatus(mine === theirs ? 'synced' : 'unsaved');
+  } catch(e){ omniSetStatus('offline'); }
+}
+function omniSaveBegin(){ OMNI_SAVING++; omniSetStatus('saving'); }
+function omniSaveEnd(){
+  OMNI_SAVING = Math.max(0, OMNI_SAVING-1);
+  if (OMNI_SAVING > 0) return;
+  if (OMNI_BOOTING){ omniSetStatus(OMNI_ONLINE ? 'synced' : 'local'); return; }
+  setTimeout(()=>omniVerifySync(1), 800);
+}
+async function omniRecheck(){
+  omniSetStatus('connecting');
+  await omniLoadAll();
+  omniApply(false);
+  omniToast(OMNI_ONLINE ? 'Reconnected ✓' : 'Still offline','var(--muted)');
 }
 
 function omniToast(msg, color){
@@ -3922,8 +4111,12 @@ function omniClearLock(enc){ const title=decodeURIComponent(enc);
 //  BOOT
 // ============================================================================
 async function omniInit(){
+  omniSetStatus('connecting');
   const addedFromReviews = await omniLoadAll();
+  if (OMNI_ONLINE) omniBootHide();   // problems keep the overlay up with an explanation
   omniApply(addedFromReviews > 0);   // persist if reviewed films newly became watched
+  OMNI_BOOTING = false;
+  omniSetStatus(OMNI_ONLINE ? 'synced' : 'local');
   if (addedFromReviews > 0)
     omniToast(`${addedFromReviews} reviewed film${addedFromReviews>1?'s':''} marked as watched`,'var(--new)');
 }
