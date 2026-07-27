@@ -836,6 +836,23 @@
     background: rgba(255,107,107,0.08); font-size: 11.5px; color: var(--text); line-height: 1.5;
   }
   .boot-err code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); word-break: break-all; }
+  #boot-review { display: none; margin-top: 18px; }
+  #boot-review .br-btn {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 12px 14px; border: none; border-radius: var(--radius-sm);
+    background: var(--accent); color: #0A0D16; cursor: pointer; text-align: left;
+    font-family: var(--body);
+  }
+  #boot-review .br-kicker {
+    font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 1px;
+    border: 1px solid rgba(10,13,22,0.4); border-radius: 4px; padding: 1px 5px 0; flex: 0 0 auto;
+  }
+  #boot-review .br-title {
+    font-size: 13.5px; font-weight: 800;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #boot-review .br-sub { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
+
   .boot-skip {
     display: none; margin-top: 14px; width: 100%; padding: 10px;
     border-radius: var(--radius-sm); background: var(--accent); color: var(--bg);
@@ -870,6 +887,7 @@
       <div class="boot-step" id="bs-fixtures"><i></i><span>Match days</span><em></em></div>
       <div class="boot-step" id="bs-reviews"><i></i><span>Reviews</span><em></em></div>
     </div>
+    <div id="boot-review"></div>
     <div class="boot-err" id="boot-err"></div>
     <button class="boot-skip" id="boot-skip" onclick="omniBootHide()">Continue offline</button>
   </div>
@@ -3620,6 +3638,7 @@ async function omniLoadAll(){
     }
   } catch(e){}
   omniBootStep('state', ok ? 'ok' : (stale ? 'stale' : 'fail'), stateNote);
+  if (ok) try { omniBootReviewOffer(OMNI_STATE.committed); } catch(e){}
   let scrapeStep = { status:'fail', note:'unreachable' };
   try {
     const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape&t=' + Date.now())).json();
@@ -3685,10 +3704,19 @@ function omniAbsorbReviewTitles(titles){
 let OMNI_REVIEW_ADDED = [];
 
 // Called straight after a review is saved, so the film drops out immediately.
+let OMNI_REVIEW_QUEUE = [];
 function omniReviewSaved(title){
   OMNI_REVIEW_DISMISSED.add(omniNormTitle(title));
   const j = document.getElementById('omni-review-jump');
   if (j && j.dataset.title === omniNormTitle(title)) j.remove();
+  if (OMNI_BOOTING){
+    // The Sheet's state hasn't loaded yet — saving now would overwrite it with
+    // the stale built-in seed. The review itself is already safely posted;
+    // park the watched-marking until the load lands.
+    OMNI_REVIEW_QUEUE.push(title);
+    omniToast(`Review saved — “${omniNormTitle(title)}” will be marked watched once loading finishes`,'var(--new)');
+    return;
+  }
   if (omniAbsorbReviewTitles([title]) > 0){
     omniApply(true);
     omniToast(`“${omniNormTitle(title)}” marked as watched`,'var(--new)');
@@ -4376,10 +4404,10 @@ function omniClearLock(enc){ const title=decodeURIComponent(enc);
 // ============================================================================
 let OMNI_REVIEW_DISMISSED = new Set();
 
-function omniLastSeenFilm(){
+function omniLastSeenFilm(source){
   const now = new Date();
   let best = null;
-  (DATA.schedule || []).forEach(f => {
+  (source || DATA.schedule || []).forEach(f => {
     const s = f.showing; if (!s || !s.date || !s.start) return;
     const [hh, mm] = String(s.start).split(':').map(Number);
     const dt = parseDateStr(s.date); dt.setHours(hh||0, mm||0, 0, 0);
@@ -4412,9 +4440,7 @@ function omniReviewJumpDismiss(){
   const el = document.getElementById('omni-review-jump');
   if (el){ OMNI_REVIEW_DISMISSED.add(el.dataset.title || ''); el.remove(); }
 }
-function omniJumpToReview(){
-  const el = document.getElementById('omni-review-jump');
-  const title = el ? el.dataset.title : '', date = el ? el.dataset.date : '';
+function omniPrefillReview(title, date){
   showPage('reviews');
   try { showReviewSection('rate'); } catch(e){}
   setTimeout(() => {
@@ -4428,6 +4454,35 @@ function omniJumpToReview(){
     window.scrollTo({ top: 0 });
   }, 30);
 }
+function omniJumpToReview(){
+  const el = document.getElementById('omni-review-jump');
+  omniPrefillReview(el ? el.dataset.title : '', el ? el.dataset.date : '');
+}
+
+// Offer the review straight from the loading screen. Uses whatever schedule is
+// in hand right now (embedded snapshot first, then the Sheet's committed picks
+// once they arrive) — the rest keeps loading in the background.
+function omniBootReviewOffer(source){
+  const host = document.getElementById('boot-review'); if (!host) return;
+  const hit = omniLastSeenFilm(source);
+  if (!hit){ host.style.display='none'; host.innerHTML=''; return; }
+  host.innerHTML = `
+    <button class="br-btn" onclick="omniBootJump()">
+      <span class="br-kicker">REVIEW</span>
+      <span class="br-title"></span>
+    </button>
+    <div class="br-sub">Straight to the review — everything else keeps loading behind it.</div>`;
+  host.querySelector('.br-title').textContent = hit.title;
+  host.dataset.title = hit.title; host.dataset.date = hit.date;
+  host.style.display = 'block';
+}
+function omniBootJump(){
+  const host = document.getElementById('boot-review');
+  const title = host ? host.dataset.title : '', date = host ? host.dataset.date : '';
+  OMNI_REVIEW_DISMISSED.add(title);   // no floating nag for the same film afterwards
+  omniBootHide();
+  omniPrefillReview(title, date);
+}
 
 window.addEventListener('beforeunload', function(e){
   const pill = document.getElementById('omni-conn');
@@ -4439,9 +4494,12 @@ window.addEventListener('beforeunload', function(e){
 
 async function omniInit(){
   omniSetStatus('connecting');
+  omniBootReviewOffer();                       // from the built-in snapshot, instantly
   const addedFromReviews = await omniLoadAll();
+  const queued = OMNI_REVIEW_QUEUE.splice(0);  // reviews done while we were loading
+  const absorbed = omniAbsorbReviewTitles(queued);
   if (OMNI_ONLINE) omniBootHide();   // problems keep the overlay up with an explanation
-  omniApply(addedFromReviews > 0);   // persist if reviewed films newly became watched
+  omniApply(addedFromReviews > 0 || absorbed > 0);   // persist if reviewed films newly became watched
   OMNI_BOOTING = false;
   omniSetStatus(OMNI_ONLINE ? 'synced' : 'local');
   if (addedFromReviews > 0)
