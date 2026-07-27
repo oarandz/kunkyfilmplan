@@ -1841,21 +1841,53 @@ function buildStatsPage() {
     </div>`;
   }
 
-  const R = STATS.record_stats;
-  const currentPct = STATS.current_total > 0 ? Math.round(STATS.current_seen / STATS.current_total * 100) : 0;
-  const totalWeeks = Math.round((new Date(STATS.watch_end) - new Date(STATS.watch_start)) / (7*24*60*60*1000));
+  const S = (typeof omniLiveStats === 'function') ? omniLiveStats() : STATS.record_stats;
+  const R = S;
+  const currentPct = S.current_total > 0 ? Math.round(S.current_seen / S.current_total * 100) : 0;
+  const totalWeeks = Math.max(1, Math.round((parseDateStr(omniToday()) - parseDateStr(S.watch_start)) / (7*24*60*60*1000)));
+  const yearNow = omniToday().slice(0,4);
 
-  let html = `<div class="week-header"><h2>STATS</h2><span class="subtitle">Since ${fmtDate(STATS.watch_start)}</span></div>`;
+  let html = `<div class="week-header"><h2>STATS</h2><span class="subtitle">Since ${fmtDate(S.watch_start)} · live</span></div>`;
 
   // Top stat cards
   html += `<div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">`;
-  html += statCard(R.total_overall, 'Films Watched', `over ~${totalWeeks} weeks`);
-  html += statCard(R.total_this_year, 'Films in 2026', `so far this year`);
+  html += statCard(S.total_overall, 'Films Watched', `over ~${totalWeeks} weeks`);
+  html += statCard(S.total_this_year, 'Films in ' + yearNow, `so far this year`);
+  html += `</div>`;
+  html += `<div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">`;
+  html += statCard(currentPct + '%', 'Currently Seen', `${S.current_seen} of ${S.current_total} showing`);
+  html += statCard(S.seen_share_pct + '%', 'Screen Share', 'of all current screenings');
   html += `</div>`;
   html += `<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">`;
-  html += statCard(currentPct + '%', 'Currently Seen', `${STATS.current_seen} of ${STATS.current_total} showing`);
-  html += statCard(STATS.seen_share_pct + '%', 'Screen Share', 'of all current screenings');
+  html += statCard(S.days_since_last, S.days_since_last === 1 ? 'Day Since a Film' : 'Days Since a Film',
+    S.last_film ? `last: ${S.last_film.title}` : '');
+  html += statCard(S.avg_per_active_week, 'Films / Active Week', `${S.weeks_active} weeks with a trip`);
   html += `</div>`;
+
+  // Ratings, live from the reviews sheet
+  const RT = (typeof omniRatingsStats === 'function') ? omniRatingsStats() : null;
+  html += `<div class="section-title">RATINGS<span class="section-count">from reviews</span></div>`;
+  if (RT){
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">`;
+    html += `<div style="display:flex;gap:0;border-bottom:1px solid var(--border);">`;
+    html += `<div style="flex:1;padding:12px 14px;"><div style="font-family:'Archivo',sans-serif;font-size:26px;color:var(--accent);line-height:1">${RT.group_avg}%</div><div style="font-size:11px;color:var(--muted);margin-top:2px">group average</div></div>`;
+    html += `<div style="flex:1;padding:12px 14px;border-left:1px solid var(--border);"><div style="font-family:'Archivo',sans-serif;font-size:26px;color:var(--accent);line-height:1">${RT.total}</div><div style="font-size:11px;color:var(--muted);margin-top:2px">reviews logged</div></div>`;
+    html += `</div>`;
+    html += `<div style="display:flex;padding:10px 14px;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--border);">`;
+    RT.people.forEach(pp => {
+      html += `<span style="display:inline-flex;align-items:center;gap:6px;"><span class="attendee-chip ${chipClass(pp.person)}">${pp.person}</span><span style="font-size:12.5px;font-weight:700;color:var(--text)">${pp.avg}%</span><span style="font-size:10.5px;color:var(--muted)">× ${pp.n}</span></span>`;
+    });
+    html += `</div>`;
+    RT.top.forEach((f,i) => {
+      html += recordRow(['1ST','2ND','3RD'][i] || 'TOP', i===0 ? 'Highest rated' : '\u00A0',
+        `${f.title}`, `${Math.round(f.avg)}% · ${f.n} review${f.n>1?'s':''}`);
+    });
+    if (RT.bottom) html += recordRow('LOW', 'Lowest rated', RT.bottom.title, `${Math.round(RT.bottom.avg)}%`);
+    if (RT.divisive) html += recordRow('SPLIT', 'Most divisive', RT.divisive.title, `${RT.divisive.spread} points apart`);
+    html += `<div style="height:1px;"></div></div>`;
+  } else {
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--muted);">Reviews haven't loaded — open the Reviews tab or check the connection, and this fills in.</div>`;
+  }
 
   // Records box
   html += `<div class="section-title">RECORDS</div>`;
@@ -1872,15 +1904,17 @@ function buildStatsPage() {
   html += recordRow('RUN', 'Longest streak',
     `${R.longest_streak.days} consecutive days`,
     `${fmtDate(R.longest_streak.from)} → ${fmtDate(R.longest_streak.to)}`);
+  const gapNow = S.days_since_last > R.longest_gap.days;
   html += recordRow('GAP', 'Longest gap without a film',
-    `${R.longest_gap.days} days`,
-    `${fmtDate(R.longest_gap.from)} → ${fmtDate(R.longest_gap.to)}`);
+    gapNow ? `${S.days_since_last} days — ongoing` : `${R.longest_gap.days} days`,
+    gapNow ? `since ${fmtDate(S.last_film ? S.last_film.date : omniToday())}`
+           : `${fmtDate(R.longest_gap.from)} → ${fmtDate(R.longest_gap.to)}`);
   html += recordRow('DAYS', 'Total cinema days',
     `${R.cinema_days} days`,
     `avg ${R.avg_per_cinema_day} films per visit`);
   html += recordRow('AVG', 'Weekly average',
-    `${STATS.avg_per_active_week} films/week`,
-    `on the ${STATS.weeks_active} weeks you went`);
+    `${S.avg_per_active_week} films/week`,
+    `on the ${S.weeks_active} weeks you went`);
   html += `<div style="height:1px;background:transparent;"></div>`; // remove last border
   html += `</div>`;
 
@@ -1917,16 +1951,17 @@ function buildStatsPage() {
   el.innerHTML = html;
 
   requestAnimationFrame(() => {
-    drawLineChart('pct-chart',
-      STATS.pct_timeline.map(p => p.date),
-      STATS.pct_timeline.map(p => p.pct),
-      '%', 100);
+    const pctPts = (STATS.pct_timeline || []).slice();
+    const livePct = S.current_total > 0 ? Math.round(S.current_seen / S.current_total * 100) : null;
+    if (livePct !== null && (!pctPts.length || pctPts[pctPts.length-1].date !== omniToday()))
+      pctPts.push({ date: omniToday(), pct: livePct });
+    drawLineChart('pct-chart', pctPts.map(p => p.date), pctPts.map(p => p.pct), '%', 100);
     drawBarChart('period-chart',
-      STATS.month_data.map(m => fmtMonth(m.month)),
-      STATS.month_data.map(m => m.count));
+      S.month_data.map(m => fmtMonth(m.month)),
+      S.month_data.map(m => m.count));
     drawBarChart('day-chart',
-      STATS.day_data.map(d => d.day.slice(0,3)),
-      STATS.day_data.map(d => d.count));
+      S.day_data.map(d => d.day.slice(0,3)),
+      S.day_data.map(d => d.count));
   });
 }
 
@@ -1936,12 +1971,13 @@ function switchPeriod(period) {
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtMonth(ym) { const [y,m]=ym.split('-'); return months[parseInt(m)-1]+' '+y.slice(2); }
   function fmtWeekShort(dateStr) { const d=parseDateStr(dateStr); return `${d.getDate()} ${months[d.getMonth()]}`; }
+  const SRC = OMNI_LIVE_STATS || STATS;
   const labels = period==='month'
-    ? STATS.month_data.map(m => fmtMonth(m.month))
-    : STATS.films_per_week.map(w => fmtWeekShort(w.week));
+    ? SRC.month_data.map(m => fmtMonth(m.month))
+    : SRC.films_per_week.map(w => fmtWeekShort(w.week));
   const values = period==='month'
-    ? STATS.month_data.map(m => m.count)
-    : STATS.films_per_week.map(w => w.count);
+    ? SRC.month_data.map(m => m.count)
+    : SRC.films_per_week.map(w => w.count);
   drawBarChart('period-chart', labels, values);
   ['month','week'].forEach(p => {
     const btn = document.getElementById('btn-'+p);
@@ -1965,7 +2001,7 @@ function drawLineChart(canvasId, labels, values, unit, maxOverride) {
   const pad = {top:12, right:16, bottom:28, left:36};
   const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
   const max = maxOverride || Math.max(...values, 1);
-  const accent = '#e8c45a', muted = '#7a7d88', border = '#2a2d34';
+  const accent = '#FFD447', muted = '#8A93AB', border = '#262E42';
 
   [0,25,50,75,100].forEach(v => {
     if (v > max + 5) return;
@@ -2853,7 +2889,7 @@ function drawRevBarChart(canvasId, labels, values, filmEntries, sortBy, personCo
   const pad = {top:14, right:10, bottom:50, left:10};
   const cw = W-pad.left-pad.right, ch = H-pad.top-pad.bottom;
   const maxVal = 5;
-  const accent = '#e8c45a', muted = '#7a7d88', border = '#2a2d34';
+  const accent = '#FFD447', muted = '#8A93AB', border = '#262E42';
   const gap = cw / labels.length, barW = gap * 0.65;
   const people = ['Owen','Conor','Alice'];
   const pColors = { Owen: '#a78bfa', Conor: '#34d399', Alice: '#f472b6' };
@@ -3396,6 +3432,148 @@ function omniSerialiseCommitted(entry){
       all_can_watch:!!entry.showing.all_can_watch, is_maxx:!!entry.showing.is_maxx, is_estimated:!!entry.showing.is_estimated } };
 }
 
+// ============================================================================
+//  LIVE STATS — everything derived from the data in hand, at render time.
+//  Timeline = embedded history (STATS.cumulative) extended by reviews, which
+//  carry a film + the date it was watched. Records, charts and current-
+//  screening figures are all recomputed from that.
+// ============================================================================
+let OMNI_LIVE_STATS = null;
+
+function omniIsoDate(v){
+  const s = String(v||'');
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : '';
+}
+function omniWeekStart(dateStr){          // Monday of that week
+  const d = parseDateStr(dateStr);
+  const off = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - off);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function omniLiveTimeline(){
+  const base = (typeof STATS !== 'undefined' && STATS.cumulative) ? STATS.cumulative : [];
+  const have = new Set(base.map(e => omniNormTitle(e.title).toLowerCase()));
+  // earliest review date per not-yet-listed film
+  const firstReview = {};
+  const today = omniToday();
+  ((typeof _reviewCache !== 'undefined' && Array.isArray(_reviewCache)) ? _reviewCache : []).forEach(r => {
+    if (!r || !r.film) return;
+    const t = omniNormTitle(r.film); const key = t.toLowerCase();
+    if (have.has(key)) return;
+    const d = omniIsoDate(r.date) || omniIsoDate(r.timestamp);
+    if (!d || d > today) return;
+    if (!firstReview[key] || d < firstReview[key].date) firstReview[key] = { title:t, date:d };
+  });
+  const events = base.map(e => ({ date:e.date, title:e.title }))
+    .concat(Object.values(firstReview))
+    .filter(e => e.date)
+    .sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  return events;
+}
+
+function omniLiveStats(){
+  const tl = omniLiveTimeline();
+  const today = omniToday();
+  const year = today.slice(0,4);
+
+  const byDay = {}, byWeek = {}, byMonth = {}, byDow = [0,0,0,0,0,0,0];
+  tl.forEach(e => {
+    (byDay[e.date] = byDay[e.date] || []).push(e.title);
+    const w = omniWeekStart(e.date); (byWeek[w] = byWeek[w] || []).push(e.title);
+    const m = e.date.slice(0,7); (byMonth[m] = byMonth[m] || []).push(e.title);
+    byDow[parseDateStr(e.date).getDay()]++;
+  });
+  const best = obj => { let k=null; for (const key in obj) if (!k || obj[key].length > obj[k].length) k = key; return k; };
+  const days = Object.keys(byDay).sort();
+
+  let streak = { days:0, from:'', to:'' }, run = 1;
+  for (let i=1; i<=days.length; i++){
+    const cont = i < days.length && (parseDateStr(days[i]) - parseDateStr(days[i-1])) === 86400000;
+    if (cont) run++;
+    else { if (run > streak.days) streak = { days:run, from:days[i-run], to:days[i-1] }; run = 1; }
+  }
+  let gap = { days:0, from:'', to:'' };
+  for (let i=1; i<days.length; i++){
+    const g = Math.round((parseDateStr(days[i]) - parseDateStr(days[i-1])) / 86400000);
+    if (g > gap.days) gap = { days:g, from:days[i-1], to:days[i] };
+  }
+  const last = days[days.length-1] || today;
+  const sinceLast = Math.max(0, Math.round((parseDateStr(today) - parseDateStr(last)) / 86400000));
+
+  // current screenings, from the same pool the rest of the app uses
+  const pool = omniFilmTitlePool();
+  const watched = new Set(
+    (OMNI_STATE.watched.length ? OMNI_STATE.watched
+      : (typeof STATS!=='undefined' && STATS.cumulative ? STATS.cumulative.map(c=>c.title) : []))
+    .map(t => omniNormTitle(t).toLowerCase()));
+  const seenNow = pool.filter(f => watched.has(f.title.toLowerCase()));
+  const screenTotal = pool.reduce((n,f)=>n+f.count, 0);
+  const screenSeen  = seenNow.reduce((n,f)=>n+f.count, 0);
+
+  const mk = best(byMonth), wk = best(byWeek), dk = best(byDay);
+  const S = {
+    timeline: tl,
+    total_overall: tl.length,
+    total_this_year: tl.filter(e => e.date.slice(0,4) === year).length,
+    cinema_days: days.length,
+    avg_per_cinema_day: days.length ? +(tl.length / days.length).toFixed(2) : 0,
+    weeks_active: Object.keys(byWeek).length,
+    avg_per_active_week: Object.keys(byWeek).length ? +(tl.length / Object.keys(byWeek).length).toFixed(1) : 0,
+    watch_start: days[0] || today,
+    last_film: tl[tl.length-1] || null,
+    days_since_last: sinceLast,
+    most_in_day:   dk ? { count:byDay[dk].length, date:dk, titles:byDay[dk] } : {count:0,date:today,titles:[]},
+    most_in_week:  wk ? { count:byWeek[wk].length, week:wk, titles:byWeek[wk] } : {count:0,week:today,titles:[]},
+    most_in_month: mk ? { count:byMonth[mk].length, month:mk, titles:byMonth[mk] } : {count:0,month:today.slice(0,7),titles:[]},
+    longest_streak: streak.days ? streak : {days:1, from:last, to:last},
+    longest_gap: gap,
+    current_total: pool.length,
+    current_seen: seenNow.length,
+    seen_share_pct: screenTotal ? Math.round(screenSeen / screenTotal * 100) : 0,
+    month_data: Object.keys(byMonth).sort().map(m => ({ month:m, count:byMonth[m].length })),
+    films_per_week: Object.keys(byWeek).sort().slice(-26).map(w => ({ week:w, count:byWeek[w].length })),
+    day_data: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+      .map(d => ({ day:d, count: byDow[DAY_NAMES.indexOf(d)] })),
+  };
+  OMNI_LIVE_STATS = S;
+  return S;
+}
+
+// Ratings, straight from the reviews in the Sheet.
+function omniRatingsStats(){
+  const rows = (typeof _reviewCache !== 'undefined' && Array.isArray(_reviewCache)) ? _reviewCache : null;
+  if (!rows || !rows.length) return null;
+  const people = {};
+  const films = {};
+  rows.forEach(r => {
+    if (!r || !r.film) return;
+    const pct = parseFloat(r.pct); if (isNaN(pct)) return;
+    const t = omniNormTitle(r.film);
+    (people[r.person] = people[r.person] || []).push(pct);
+    (films[t] = films[t] || []).push({ person:r.person, pct });
+  });
+  const avg = a => a.reduce((x,y)=>x+y,0) / a.length;
+  const filmAvgs = Object.keys(films).map(t => ({ title:t, avg:avg(films[t].map(x=>x.pct)), n:films[t].length }));
+  filmAvgs.sort((a,b)=> b.avg - a.avg);
+  let divisive = null;
+  Object.keys(films).forEach(t => {
+    const ps = films[t]; if (ps.length < 2) return;
+    const vals = ps.map(x=>x.pct);
+    const spread = Math.max(...vals) - Math.min(...vals);
+    if (!divisive || spread > divisive.spread) divisive = { title:t, spread:Math.round(spread) };
+  });
+  return {
+    total: rows.length,
+    group_avg: Math.round(avg(rows.filter(r=>!isNaN(parseFloat(r.pct))).map(r=>parseFloat(r.pct)))),
+    people: Object.keys(people).map(p => ({ person:p, n:people[p].length, avg:Math.round(avg(people[p])) })),
+    top: filmAvgs.slice(0,3),
+    bottom: filmAvgs.length > 3 ? filmAvgs[filmAvgs.length-1] : null,
+    divisive,
+  };
+}
+
 // ---- Rebuild + repaint. `persist` saves state to the Sheet. We also save when
 //      reconciliation genuinely changed the committed schedule.
 function omniApply(persist){
@@ -3404,7 +3582,7 @@ function omniApply(persist){
   OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
   try{buildWeekPage();}catch(e){} try{buildFuturePage();}catch(e){} try{buildScreeningsPage();}catch(e){}
   try{buildImpossiblePage();}catch(e){} try{buildKidsPage();}catch(e){} try{buildExcludedPage();}catch(e){}
-  try{buildMissedPage();}catch(e){}
+  try{buildMissedPage();}catch(e){} try{buildStatsPage();}catch(e){}
   omniBuildDiaryPage(); omniBuildDataPage();
   try { omniReviewShortcut(); } catch(e){}
   if (persist || committedChanged) omniSaveState();
