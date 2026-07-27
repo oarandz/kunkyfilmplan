@@ -765,6 +765,36 @@
   .date-chip, .count-chip, .genre-chip { font-size: 10.5px; padding: 2.5px 8px; }
 
 
+  /* --- QUICK REVIEW JUMP --------------------------------------------------- */
+  #omni-review-jump {
+    position: fixed; right: 14px; bottom: 16px; z-index: 9600;
+    display: flex; align-items: stretch;
+    border-radius: 999px; overflow: hidden;
+    box-shadow: 0 6px 24px -6px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,212,71,0.35);
+  }
+  #omni-review-jump .rj-main {
+    display: flex; align-items: center; gap: 8px;
+    max-width: 240px; padding: 10px 6px 10px 14px;
+    background: var(--accent); color: #0A0D16; border: none; cursor: pointer;
+    font-family: var(--body); text-align: left;
+  }
+  #omni-review-jump .rj-kicker {
+    font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 1px;
+    border: 1px solid rgba(10,13,22,0.4); border-radius: 4px; padding: 1px 5px 0;
+    flex: 0 0 auto;
+  }
+  #omni-review-jump .rj-title {
+    font-size: 12.5px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #omni-review-jump .rj-x {
+    background: var(--accent); color: rgba(10,13,22,0.55); border: none;
+    border-left: 1px solid rgba(10,13,22,0.22);
+    font-size: 15px; padding: 0 10px; cursor: pointer;
+  }
+  #omni-review-jump .rj-x:hover { color: #0A0D16; }
+  @media (max-width: 480px) { #omni-review-jump .rj-main { max-width: 180px; } }
+
   /* --- BOOT OVERLAY + SYNC PILL ------------------------------------------- */
   #omni-boot {
     position: fixed; inset: 0; z-index: 10050;
@@ -968,8 +998,13 @@ function reasonLabel(r) {
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('page-' + name).classList.add('active');
-  event.target.classList.add('active');
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const tab = (typeof event !== 'undefined' && event && event.target && event.target.classList
+               && event.target.classList.contains('tab'))
+    ? event.target
+    : document.querySelector(`.tab[onclick*="'${name}'"]`);
+  if (tab) tab.classList.add('active');
 }
 
 // ========== PAGE: CALENDAR ==========
@@ -2301,6 +2336,7 @@ function submitReview() {
   }
 
   setRevStatus('Saving...', 'var(--muted)');
+  if (typeof omniSaveBegin === 'function') omniSaveBegin();
   fetch(REVIEWS_WEBHOOK_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -2310,8 +2346,10 @@ function submitReview() {
     setRevStatus('✓ Review saved!', 'var(--new)');
     _reviewCache = null; // invalidate cache
     try { omniReviewSaved(payload.film); } catch(e) {}   // reviewed = watched
+    if (typeof omniSaveEnd === 'function') omniSaveEnd();
   }).catch(e => {
     setRevStatus('Error saving: ' + e.message, 'var(--danger)');
+    if (typeof omniSaveEnd === 'function') omniSaveEnd();
   });
 }
 
@@ -3251,6 +3289,26 @@ function omniBuildData(){
     });
   }
   const candByTitle = {}; candidates.forEach(f => candByTitle[f.title] = f);
+
+  // SAFETY NET: never drop a committed film just because the scrape data in
+  // hand doesn't mention it (endpoint failed, Scrape sheet empty, stale embed).
+  // Rebuild it from its own stored showing, marked estimated, re-checked
+  // against today's rules. It ages out when its date passes or a real upload
+  // replaces the log.
+  for (const c of OMNI_STATE.committed){
+    if (candByTitle[c.title]) continue;
+    if (watched.has(c.title.toLowerCase()) || dnw.has(c.title.toLowerCase())) continue;
+    const cs = c.showing || {};
+    if (!cs.date || cs.date < today) continue;
+    const s = omniAnnotate({ date:cs.date, date_human:cs.date_human||'', start:cs.start, end:cs.end,
+      screen:cs.screen||'', url:cs.url||'', is_maxx:!!cs.is_maxx, is_estimated:true });
+    const orphan = { title:c.title, is_rerelease:!!c.is_rerelease, rating:c.rating||'',
+      genres:c.genres||[], info_url:c.info_url||'', is_horror:!!c.is_horror,
+      is_estimated:true, showings:[s],
+      watchable_count: omniSchedulable(s) ? 1 : 0 };
+    candidates.push(orphan); candByTitle[c.title] = orphan;
+  }
+
   const lockByTitle = {}; OMNI_STATE.locks.forEach(l => lockByTitle[l.title] = l);
   const commitByTitle = {}; OMNI_STATE.committed.forEach(c => commitByTitle[c.title] = c);
 
@@ -3348,6 +3406,7 @@ function omniApply(persist){
   try{buildImpossiblePage();}catch(e){} try{buildKidsPage();}catch(e){} try{buildExcludedPage();}catch(e){}
   try{buildMissedPage();}catch(e){}
   omniBuildDiaryPage(); omniBuildDataPage();
+  try { omniReviewShortcut(); } catch(e){}
   if (persist || committedChanged) omniSaveState();
 }
 
@@ -3449,6 +3508,9 @@ let OMNI_REVIEW_ADDED = [];
 
 // Called straight after a review is saved, so the film drops out immediately.
 function omniReviewSaved(title){
+  OMNI_REVIEW_DISMISSED.add(omniNormTitle(title));
+  const j = document.getElementById('omni-review-jump');
+  if (j && j.dataset.title === omniNormTitle(title)) j.remove();
   if (omniAbsorbReviewTitles([title]) > 0){
     omniApply(true);
     omniToast(`“${omniNormTitle(title)}” marked as watched`,'var(--new)');
@@ -3628,8 +3690,7 @@ async function omniVerifySync(attempt){
   try {
     const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
     if (!s || Array.isArray(s)) { omniSetStatus('offline'); return; }
-    const mine   = OMNI_STATE.committed.length+'/'+OMNI_STATE.diary.length+'/'+OMNI_STATE.locks.length;
-    const theirs = (s.committed||[]).length+'/'+(s.diary||[]).length+'/'+(s.locks||[]).length;
+    const mine = omniFingerprint(OMNI_STATE), theirs = omniFingerprint(s);
     if (mine !== theirs && attempt < 3){          // give the write time to land
       omniSetStatus('saving');
       setTimeout(()=>omniVerifySync(attempt+1), 1600);
@@ -3637,6 +3698,15 @@ async function omniVerifySync(attempt){
     }
     omniSetStatus(mine === theirs ? 'synced' : 'unsaved');
   } catch(e){ omniSetStatus('offline'); }
+}
+// Order-stable content fingerprint of everything that matters.
+function omniFingerprint(o){
+  const list = a => (a||[]).map(String).slice().sort().join(';');
+  const cm = (o.committed||[]).map(c => c.title+'@'+(c.showing||{}).date+'T'+(c.showing||{}).start
+    +'#'+((c.showing||{}).screen||'')+(c.fixed_date?'!':'')).sort().join(';');
+  const dy = (o.diary||[]).map(d => d.person+'|'+d.date+'|'+(d.reason||'')).sort().join(';');
+  const lk = (o.locks||[]).map(l => l.title+'@'+l.date+'T'+l.start).sort().join(';');
+  return [cm, dy, lk, list(o.watched), list(o.doNotWatch), list(o.kidsRemoved), list(o.sportRemoved)].join('||');
 }
 function omniSaveBegin(){ OMNI_SAVING++; omniSetStatus('saving'); }
 function omniSaveEnd(){
@@ -3700,7 +3770,14 @@ function omniToggleUnavail(dateStr, person){
   const i=OMNI_STATE.diary.findIndex(d=>d.date===dateStr && d.person===person);
   if (i>=0) OMNI_STATE.diary.splice(i,1);
   else OMNI_STATE.diary.push({date:dateStr, person, reason: note || 'Marked unavailable'});
-  OMNI_DIARY_PENDING=null; // this flow applies immediately; keep the diary draft in sync
+  // Mirror into any staged diary draft rather than throwing the draft away.
+  if (OMNI_DIARY_PENDING){
+    if (omniDiaryDirty()){
+      const j=OMNI_DIARY_PENDING.findIndex(d=>d.date===dateStr && d.person===person);
+      if (i>=0 && j>=0) OMNI_DIARY_PENDING.splice(j,1);
+      else if (i<0 && j<0) OMNI_DIARY_PENDING.push({date:dateStr, person, reason: note || 'Marked unavailable'});
+    } else OMNI_DIARY_PENDING=null;   // clean draft — just resync from saved
+  }
   omniApply(true); omniQuickUnavailable(dateStr);
 }
 function omniUnavailNote(dateStr){
@@ -3708,7 +3785,11 @@ function omniUnavailNote(dateStr){
   const affected=OMNI_STATE.diary.filter(d=>d.date===dateStr);
   if(!affected.length){ omniToast('Mark someone unavailable first','var(--danger)'); return; }
   affected.forEach(d=>{ d.reason = note || 'Marked unavailable'; });
-  OMNI_DIARY_PENDING=null;
+  if (OMNI_DIARY_PENDING){
+    if (omniDiaryDirty()) OMNI_DIARY_PENDING.filter(d=>d.date===dateStr)
+      .forEach(d=>{ d.reason = note || 'Marked unavailable'; });
+    else OMNI_DIARY_PENDING=null;
+  }
   omniApply(true); omniQuickUnavailable(dateStr);
   omniToast(note?'Note saved ✓':'Note cleared','var(--new)');
 }
@@ -3883,6 +3964,7 @@ function omniAddDiary(){
   const to=document.getElementById('diary-to').value||from;
   const reason=document.getElementById('diary-reason').value.trim();
   if(!from){ omniToast('Pick a date first','var(--danger)'); return; }
+  if(to < from){ omniToast('"To" is before "From" — nothing added','var(--danger)'); return; }
   if(!OMNI_DIARY_PENDING) OMNI_DIARY_PENDING=omniCloneDiary(OMNI_STATE.diary);
   let cur=parseDateStr(from), end=parseDateStr(to);
   while(cur<=end){ const ds=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
@@ -4110,6 +4192,73 @@ function omniClearLock(enc){ const title=decodeURIComponent(enc);
 // ============================================================================
 //  BOOT
 // ============================================================================
+// ============================================================================
+//  QUICK REVIEW — floating shortcut to review the film you've just seen.
+//  Assumes the most recently started scheduled film (within the last 18h).
+// ============================================================================
+let OMNI_REVIEW_DISMISSED = new Set();
+
+function omniLastSeenFilm(){
+  const now = new Date();
+  let best = null;
+  (DATA.schedule || []).forEach(f => {
+    const s = f.showing; if (!s || !s.date || !s.start) return;
+    const [hh, mm] = String(s.start).split(':').map(Number);
+    const dt = parseDateStr(s.date); dt.setHours(hh||0, mm||0, 0, 0);
+    const ageH = (now - dt) / 3600000;
+    if (ageH < 0 || ageH > 18) return;              // hasn't started, or too long ago
+    if (!best || dt > best.when) best = { title: f.title, date: s.date, when: dt, start: s.start };
+  });
+  return best;
+}
+
+function omniReviewShortcut(){
+  const host = document.getElementById('omni-review-jump');
+  const hit = omniLastSeenFilm();
+  if (!hit || OMNI_REVIEW_DISMISSED.has(hit.title)){ if (host) host.remove(); return; }
+  let el = host;
+  if (!el){
+    el = document.createElement('div'); el.id = 'omni-review-jump';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `
+    <button class="rj-main" onclick="omniJumpToReview()">
+      <span class="rj-kicker">REVIEW</span>
+      <span class="rj-title"></span>
+    </button>
+    <button class="rj-x" title="Dismiss" onclick="omniReviewJumpDismiss()">×</button>`;
+  el.querySelector('.rj-title').textContent = hit.title;   // textContent — titles stay safe
+  el.dataset.title = hit.title; el.dataset.date = hit.date;
+}
+function omniReviewJumpDismiss(){
+  const el = document.getElementById('omni-review-jump');
+  if (el){ OMNI_REVIEW_DISMISSED.add(el.dataset.title || ''); el.remove(); }
+}
+function omniJumpToReview(){
+  const el = document.getElementById('omni-review-jump');
+  const title = el ? el.dataset.title : '', date = el ? el.dataset.date : '';
+  showPage('reviews');
+  try { showReviewSection('rate'); } catch(e){}
+  setTimeout(() => {
+    const search = document.getElementById('rev-film-search');
+    const value  = document.getElementById('rev-film-value');
+    const dateEl = document.getElementById('rev-date');
+    if (search) search.value = title;
+    if (value)  value.value  = title;
+    if (dateEl && date) dateEl.value = date;
+    const dd = document.getElementById('rev-film-dropdown'); if (dd) dd.style.display='none';
+    window.scrollTo({ top: 0 });
+  }, 30);
+}
+
+window.addEventListener('beforeunload', function(e){
+  const pill = document.getElementById('omni-conn');
+  const risky = (typeof omniDiaryDirty==='function' && omniDiaryDirty())
+    || OMNI_SAVING > 0
+    || (pill && /Not saved|Saving/i.test(pill.textContent));
+  if (risky){ e.preventDefault(); e.returnValue = ''; }
+});
+
 async function omniInit(){
   omniSetStatus('connecting');
   const addedFromReviews = await omniLoadAll();
