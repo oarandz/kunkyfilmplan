@@ -1807,6 +1807,30 @@ function openBooking(url) {
   window.location.href = url;
 }
 
+// Open straight onto a tab from the address, e.g. …/index.html#review or
+// #calendar. Worth bookmarking the review one — it skips the loading screen
+// entirely, since the review form needs nothing from the Sheet to open.
+const OMNI_HASH_TABS = {
+  calendar:'week', week:'week', diary:'diary', data:'data',
+  future:'future', 'coming-up':'future', screenings:'screenings',
+  'all-screenings':'screenings', impossible:'impossible', 'cant-watch':'impossible',
+  kids:'kids', excluded:'excluded', missed:'missed', stats:'stats',
+  reviews:'reviews', review:'reviews', fixtures:'fixtures',
+};
+function omniOpenFromHash(){
+  const raw = (location.hash || '').replace(/^#/, '').toLowerCase().trim();
+  if (!raw) return false;
+  const tab = OMNI_HASH_TABS[raw];
+  if (!tab) return false;
+  showPage(tab);
+  if (raw === 'review'){
+    try { showReviewSection('rate'); } catch(e){}
+    try { omniBootHide(); } catch(e){}   // nothing on this form needs the Sheet
+  }
+  return true;
+}
+window.addEventListener('hashchange', function(){ try { omniOpenFromHash(); } catch(e){} });
+
 // Overlap guard — used during schedule building to reject clashing slots
 function hasOverlap(dateStr, startStr, endStr) {
   const start = timeToMins(startStr);
@@ -2246,10 +2270,8 @@ function buildReviewsPage() {
   CATEGORIES.forEach(cat => updateSlider(cat.id));
   updateScorePreview();
 
-  // Pre-fetch reviews so duplicate check and dropdown colouring work immediately
-  if (!_reviewCache && REVIEWS_WEBHOOK_URL && REVIEWS_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
-    fetch(REVIEWS_WEBHOOK_URL + '?action=get').then(r => r.json()).then(d => { _reviewCache = d; }).catch(() => {});
-  }
+  // The reviews are already fetched as part of the initial load and land in
+  // _reviewCache from there — fetching again here just doubled the requests.
 
   // Close dropdown on outside click
   document.addEventListener('click', (e) => {
@@ -3156,6 +3178,11 @@ let OMNI_STATE_OK = false;
 // STATS.cumulative in this file is only the one-time migration seed.
 let OMNI_WATCHLOG = [];
 
+// The page now paints as soon as the shared state lands, while the scrape,
+// fixtures, watch log and reviews are still in flight. Until they have all
+// landed the scheduler is working from partial data, so nothing may be saved.
+let OMNI_LOAD_DONE = false;
+
 function omniFixtureBlocks(f, person){
   const b = String(f.blocks || 'Conor');
   return b.split(/[,;]/).map(s => s.trim()).filter(Boolean).includes(person);
@@ -3644,22 +3671,26 @@ function omniRatingsStats(){
 
 // ---- Rebuild + repaint. `persist` saves state to the Sheet. We also save when
 //      reconciliation genuinely changed the committed schedule.
-function omniApply(persist){
+// renderOnly: paint the page but leave OMNI_STATE.committed alone. Used for the
+// early paint, when the scrape hasn't landed yet — the schedule built at that
+// point comes from the orphan rebuild and the embedded fallback, and writing it
+// into committed would destroy the stickiness the real build depends on.
+function omniApply(persist, renderOnly){
   const { data, committedChanged } = omniBuildData();
   DATA = data;
-  OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
+  if (!renderOnly) OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
   try{buildWeekPage();}catch(e){} try{buildFuturePage();}catch(e){} try{buildScreeningsPage();}catch(e){}
   try{buildImpossiblePage();}catch(e){} try{buildKidsPage();}catch(e){} try{buildExcludedPage();}catch(e){}
   try{buildMissedPage();}catch(e){} try{buildStatsPage();}catch(e){}
   omniBuildDiaryPage(); omniBuildDataPage();
   try { omniReviewShortcut(); } catch(e){}
-  if (persist || committedChanged) omniSaveState();
+  if ((persist || committedChanged) && OMNI_LOAD_DONE) omniSaveState();
 }
 
 // ============================================================================
 //  PERSISTENCE — same webhook, split into small "state" and bulk "scrape"
 // ============================================================================
-async function omniLoadAll(){
+async function omniLoadAll(onStateReady){
   OMNI_STATE.watched     = (typeof STATS!=='undefined' && STATS.cumulative) ? STATS.cumulative.map(c=>c.title) : [];
   OMNI_STATE.doNotWatch  = (DATA.do_not_watch||[]).slice();
   OMNI_STATE.kidsRemoved = (DATA.kids_removed||[]).slice();
@@ -3671,10 +3702,21 @@ async function omniLoadAll(){
     omniBootFail('No webhook URL is set, so nothing can sync. The app still works on this device only.');
     omniConnBadge(false); return; }
 
+  // Fire every read at once instead of one after another. Apps Script is slow
+  // per request, so five in series was most of the wait.
+  const t = Date.now();
+  const grab = a => fetch(REVIEWS_WEBHOOK_URL + '?action=' + a + '&t=' + t)
+    .then(r => r.json()).catch(() => null);
+  const pState = grab('state'), pScrape = grab('scrape'),
+        pWatchlog = grab('watchlog'), pReviews = grab('get');
+  const pFixtures = omniLoadFixtures();
+
+  ['scrape','fixtures','watchlog','reviews'].forEach(k => omniBootStep(k,'running'));
+
   let ok = false, stateNote = 'unreachable', stale = false;
   omniBootStep('state','running');
   try {
-    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
+    const s = await pState;
     if (Array.isArray(s)){ stale = true; stateNote = 'out of date'; }
     else if (s && typeof s === 'object'){
       ok = true; stateNote = (s.committed||[]).length + ' films';
@@ -3690,9 +3732,14 @@ async function omniLoadAll(){
   OMNI_STATE_OK = ok;   // gate every write on this
   omniBootStep('state', ok ? 'ok' : (stale ? 'stale' : 'fail'), stateNote);
   if (ok) try { omniBootReviewOffer(OMNI_STATE.committed); } catch(e){}
+
+  // The diary and the committed schedule are in, so the calendar is now right.
+  // Get out of the user's way; the rest keeps loading behind the page.
+  if (ok && typeof onStateReady === 'function') { try { onStateReady(); } catch(e){} }
+
   let scrapeStep = { status:'fail', note:'unreachable' };
   try {
-    const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape&t=' + Date.now())).json();
+    const sc = await pScrape;
     if (Array.isArray(sc)){
       const real = sc.filter(f => f && f.title && f.showings);   // reviews have neither
       if (sc.length && !real.length) scrapeStep = { status:'stale', note:'Apps Script needs redeploying' };
@@ -3703,15 +3750,13 @@ async function omniLoadAll(){
   omniBootStep('scrape', scrapeStep.status, scrapeStep.note);
   if (scrapeStep.status === 'stale') stale = true;
 
-  omniBootStep('fixtures','running');
-  const fxStep = await omniLoadFixtures();
+  const fxStep = await pFixtures;
   omniBootStep('fixtures', fxStep.status, fxStep.note);
   if (fxStep.status === 'stale') stale = true;
 
-  omniBootStep('watchlog','running');
   let wlNote = 'unreachable', wlStatus = 'fail', wlSave = false;
   try {
-    const wl = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=watchlog&t=' + Date.now())).json();
+    const wl = await pWatchlog;
     if (Array.isArray(wl)){
       const real = wl.filter(e => e && e.title && e.date);   // an old deployment answers with reviews
       if (wl.length && !real.length){ wlStatus = 'stale'; wlNote = 'Apps Script needs redeploying'; }
@@ -3739,10 +3784,10 @@ async function omniLoadAll(){
     });
   }
 
-  omniBootStep('reviews','running');
-  const addedFromReviews = await omniSyncReviewedWatched();
+  const addedFromReviews = await omniSyncReviewedWatched(await pReviews);
   omniBootStep('reviews', OMNI_REVIEW_REACHED ? 'ok' : 'fail',
                OMNI_REVIEW_REACHED ? (addedFromReviews ? '+'+addedFromReviews+' watched' : 'up to date') : '');
+  OMNI_LOAD_DONE = true;   // from here on, saving is allowed
   if (wlSave && ok) omniSaveWatchlog();
 
   omniConnBadge(ok);
@@ -3758,11 +3803,13 @@ async function omniLoadAll(){
 // so it stops being scheduled. Returns how many were newly added.
 function omniNormTitle(t){ return String(t||'').split(' | ')[0].trim(); }
 let OMNI_REVIEW_REACHED = false;
-async function omniSyncReviewedWatched(){
+async function omniSyncReviewedWatched(prefetched){
   let reviews = null;
   OMNI_REVIEW_REACHED = false;
   try {
-    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
+    const r = (prefetched !== undefined && prefetched !== null)
+      ? prefetched
+      : await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
     if (Array.isArray(r)){ reviews = r; OMNI_REVIEW_REACHED = true; }
   } catch(e){ return 0; }
   if (!reviews) return 0;
@@ -4624,7 +4671,15 @@ window.addEventListener('beforeunload', function(e){
 async function omniInit(){
   omniSetStatus('connecting');
   omniBootReviewOffer();                       // from the built-in snapshot, instantly
-  const addedFromReviews = await omniLoadAll();
+
+  // As soon as the shared state arrives the calendar is correct, so drop the
+  // loading screen and render. The scrape, fixtures, watch log and reviews
+  // finish in the background and the page repaints when they do.
+  const addedFromReviews = await omniLoadAll(() => {
+    omniBootHide();
+    try { omniApply(false, true); } catch(e){}   // render only — see omniApply
+    try { omniOpenFromHash(); } catch(e){}
+  });
   const queued = OMNI_REVIEW_QUEUE.splice(0);  // reviews done while we were loading
   const absorbed = omniAbsorbReviewTitles(queued);
   if (OMNI_ONLINE) omniBootHide();   // problems keep the overlay up with an explanation
@@ -4647,6 +4702,9 @@ buildMissedPage();
 buildStatsPage();
 buildReviewsPage();
 buildFixturesPage();
+
+// Honour #review / #calendar straight away, before any network call.
+try { omniOpenFromHash(); } catch(e){}
 
 omniInit();
 </script>
