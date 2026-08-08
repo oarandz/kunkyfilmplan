@@ -886,7 +886,6 @@
       <div class="boot-step" id="bs-scrape"><i></i><span>Screenings log</span><em></em></div>
       <div class="boot-step" id="bs-fixtures"><i></i><span>Match days</span><em></em></div>
       <div class="boot-step" id="bs-reviews"><i></i><span>Reviews</span><em></em></div>
-      <div class="boot-step" id="bs-watchlog"><i></i><span>Watch history</span><em></em></div>
     </div>
     <div id="boot-review"></div>
     <div class="boot-err" id="boot-err"></div>
@@ -1697,7 +1696,7 @@ function buildImpossiblePage() {
 function buildKidsPage() {
   const el = document.getElementById('page-kids');
   let html = `<div class="week-header"><h2>KIDS FILMS</h2><span class="subtitle">Excluded from schedule</span></div>`;
-  html += `<div class="note-box">This list is kept by hand \u2014 a film is only left out if its title is on it. Nothing reads certificates or genres, so anything new has to be added yourself, under Data. Matching ignores case, punctuation and &amp;-versus-and, but a separate listing such as a subtitled or sing-along version counts as its own title and needs its own entry.</div>`;
+  html += `<div class="note-box">These films were automatically removed as children's films. Add any to the Priority list if you'd like them scheduled.</div>`;
 
   DATA.kids_removed.forEach(title => {
     html += `<div class="kids-card"><span class=ntag>KIDS</span><span class="kids-name">${title}</span></div>`;
@@ -1806,30 +1805,6 @@ function buildMissedPage() {
 function openBooking(url) {
   window.location.href = url;
 }
-
-// Open straight onto a tab from the address, e.g. …/index.html#review or
-// #calendar. Worth bookmarking the review one — it skips the loading screen
-// entirely, since the review form needs nothing from the Sheet to open.
-const OMNI_HASH_TABS = {
-  calendar:'week', week:'week', diary:'diary', data:'data',
-  future:'future', 'coming-up':'future', screenings:'screenings',
-  'all-screenings':'screenings', impossible:'impossible', 'cant-watch':'impossible',
-  kids:'kids', excluded:'excluded', missed:'missed', stats:'stats',
-  reviews:'reviews', review:'reviews', fixtures:'fixtures',
-};
-function omniOpenFromHash(){
-  const raw = (location.hash || '').replace(/^#/, '').toLowerCase().trim();
-  if (!raw) return false;
-  const tab = OMNI_HASH_TABS[raw];
-  if (!tab) return false;
-  showPage(tab);
-  if (raw === 'review'){
-    try { showReviewSection('rate'); } catch(e){}
-    try { omniBootHide(); } catch(e){}   // nothing on this form needs the Sheet
-  }
-  return true;
-}
-window.addEventListener('hashchange', function(){ try { omniOpenFromHash(); } catch(e){} });
 
 // Overlap guard — used during schedule building to reject clashing slots
 function hasOverlap(dateStr, startStr, endStr) {
@@ -2270,8 +2245,10 @@ function buildReviewsPage() {
   CATEGORIES.forEach(cat => updateSlider(cat.id));
   updateScorePreview();
 
-  // The reviews are already fetched as part of the initial load and land in
-  // _reviewCache from there — fetching again here just doubled the requests.
+  // Pre-fetch reviews so duplicate check and dropdown colouring work immediately
+  if (!_reviewCache && REVIEWS_WEBHOOK_URL && REVIEWS_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+    fetch(REVIEWS_WEBHOOK_URL + '?action=get').then(r => r.json()).then(d => { _reviewCache = d; }).catch(() => {});
+  }
 
   // Close dropdown on outside click
   document.addEventListener('click', (e) => {
@@ -2311,10 +2288,28 @@ async function onPersonChange() {
   }
 }
 
+// Every film we know about from ANY source, live — not just the list baked in
+// at build time. Covers films that arrived at the cinema after this HTML was
+// generated, films whose final showing has already passed, and orphans kept
+// alive by the committed schedule.
+function omniReviewTitlePool(){
+  const seen = new Map();   // lower -> display title (first casing wins)
+  const add = t => { const n = (typeof omniNormTitle==='function') ? omniNormTitle(t) : String(t||'').trim();
+    if (!n) return; const k = n.toLowerCase(); if (!seen.has(k)) seen.set(k, n); };
+  try { (ALL_FILM_TITLES || []).forEach(add); } catch(e){}
+  try { if (typeof OMNI_SCRAPE !== 'undefined' && Array.isArray(OMNI_SCRAPE)) OMNI_SCRAPE.forEach(f => add(f.title)); } catch(e){}
+  try { Object.keys((typeof DATA!=='undefined' && DATA.film_cache) || {}).forEach(add); } catch(e){}
+  try { ((typeof DATA!=='undefined' && DATA.schedule) || []).forEach(f => add(f.title)); } catch(e){}
+  try { ((typeof OMNI_STATE!=='undefined' && OMNI_STATE.committed) || []).forEach(c => add(c.title)); } catch(e){}
+  try { ((typeof OMNI_STATE!=='undefined' && OMNI_STATE.watched) || []).forEach(add); } catch(e){}
+  return [...seen.values()].sort((a,b)=>a.localeCompare(b));
+}
+
 function filterFilmDropdown(query) {
   const dd = document.getElementById('rev-film-dropdown');
   const q = query.toLowerCase().trim();
-  const matches = q ? ALL_FILM_TITLES.filter(t => t.toLowerCase().includes(q)).slice(0, 30) : ALL_FILM_TITLES.slice(0, 30);
+  const pool = omniReviewTitlePool();
+  const matches = q ? pool.filter(t => t.toLowerCase().includes(q)).slice(0, 30) : pool.slice(0, 30);
 
   // Find which films the selected person has already reviewed
   const person = document.getElementById('rev-person')?.value;
@@ -3168,21 +3163,6 @@ const OMNI_RULES = {
 // dates above, so match days never silently stop blocking.
 let OMNI_FIXTURES = [];
 
-// True only once the Sheet's shared state has actually been read. Until then we
-// are running on the embedded snapshot, which is older than the Sheet and has
-// weaker rules — so nothing may be written back. A failed read must never be
-// allowed to overwrite good data with a stale rebuild.
-let OMNI_STATE_OK = false;
-
-// The watch history, now kept in the Sheet's WatchLog tab: [{title, date}].
-// STATS.cumulative in this file is only the one-time migration seed.
-let OMNI_WATCHLOG = [];
-
-// The page now paints as soon as the shared state lands, while the scrape,
-// fixtures, watch log and reviews are still in flight. Until they have all
-// landed the scheduler is working from partial data, so nothing may be saved.
-let OMNI_LOAD_DONE = false;
-
 function omniFixtureBlocks(f, person){
   const b = String(f.blocks || 'Conor');
   return b.split(/[,;]/).map(s => s.trim()).filter(Boolean).includes(person);
@@ -3353,50 +3333,21 @@ function omniPickBest(showings, taken){
   return opts[0];
 }
 
-// One consistent key for matching titles against the watched / doNotWatch /
-// kidsRemoved / sportRemoved lists. Ignores case, punctuation and the
-// &-versus-and difference, so a title only has to be listed once.
-function omniListKey(title){
-  return String(title || '')
-    .split(' | ')[0]
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-// Omniplex lists subtitled, dubbed and sing-along screenings as separate films
-// with their own titles, so each needs its own entry. Anything here always
-// counts as a kids film, whatever is stored in the Sheet.
-const OMNI_ALWAYS_KIDS = [
-  'Minions & Monsters',
-  'Minions and Monsters',
-  'Moana',
-  'Moana (Sing along)',
-  'Paw Patrol: The Dino Movie',
-  'Paw Patrol: The Dino Movie (Subtitled Screening)',
-  "Kiki's Delivery Service (Dubbed)",
-  "Kiki's Delivery Service (Subtitles)",
-];
-
 // ---- The STICKY solver. Keeps every valid committed pick exactly where it is;
 //      only (re)places films that are new or whose pick is no longer good.
 function omniBuildData(){
   const today = omniToday();
   let rawFilms = omniNormaliseRaw(OMNI_SCRAPE || DATA.film_cache || {});
 
-  const kidsAll = (OMNI_STATE.kidsRemoved || []).concat(
-    OMNI_ALWAYS_KIDS.filter(t => !(OMNI_STATE.kidsRemoved || [])
-      .some(x => omniListKey(x) === omniListKey(t))));
-  const watched = new Set((OMNI_STATE.watched || []).map(omniListKey));
-  const dnw   = new Set((OMNI_STATE.doNotWatch || []).map(omniListKey));
-  const kids  = new Set(kidsAll.map(omniListKey));
-  const sport = new Set((OMNI_STATE.sportRemoved || []).map(omniListKey));
+  const watched = new Set(OMNI_STATE.watched.map(t=>t.toLowerCase()));
+  const dnw   = new Set(OMNI_STATE.doNotWatch.map(t=>t.toLowerCase()));
+  const kids  = new Set(OMNI_STATE.kidsRemoved.map(t=>t.toLowerCase()));
+  const sport = new Set(OMNI_STATE.sportRemoved.map(t=>t.toLowerCase()));
 
   const excluded_films = [];
   const candidates = [];
   for (const f of rawFilms){
-    const key = omniListKey(f.title);
+    const key = f.title.toLowerCase();
     const future = f.showings.filter(s => s.date >= today);
     if (!future.length) continue;
     if (dnw.has(key)){ excluded_films.push(omniExcluded(f, future, 'do_not_watch', 'On the do-not-watch list')); continue; }
@@ -3416,16 +3367,9 @@ function omniBuildData(){
   // Rebuild it from its own stored showing, marked estimated, re-checked
   // against today's rules. It ages out when its date passes or a real upload
   // replaces the log.
-  //
-  // It must respect EVERY exclusion list. A film the kids or sport filter has
-  // just removed is absent from candidates for a good reason, and is otherwise
-  // indistinguishable here from one the scrape failed to return — without this
-  // guard it gets resurrected, scheduled, and written back to committed on
-  // every single run.
   for (const c of OMNI_STATE.committed){
     if (candByTitle[c.title]) continue;
-    const ck = omniListKey(c.title);
-    if (watched.has(ck) || dnw.has(ck) || kids.has(ck) || sport.has(ck)) continue;
+    if (watched.has(c.title.toLowerCase()) || dnw.has(c.title.toLowerCase())) continue;
     const cs = c.showing || {};
     if (!cs.date || cs.date < today) continue;
     const s = omniAnnotate({ date:cs.date, date_human:cs.date_human||'', start:cs.start, end:cs.end,
@@ -3501,7 +3445,7 @@ function omniBuildData(){
   return { committedChanged, data: {
     today, schedule, all_films: candidates,
     impossible_films: candidates.filter(f => f.watchable_count === 0),
-    partial_group: [], kids_removed: kidsAll, suppressed_variants: [],
+    partial_group: [], kids_removed: OMNI_STATE.kidsRemoved, suppressed_variants: [],
     missed_films: DATA.missed_films || [], sport_removed: OMNI_STATE.sportRemoved,
     do_not_watch: OMNI_STATE.doNotWatch, film_cache: newCache, carried_forward: [],
     excluded_films, watched_still_screening: [],
@@ -3545,10 +3489,7 @@ function omniWeekStart(dateStr){          // Monday of that week
 }
 
 function omniLiveTimeline(){
-  // The Sheet's WatchLog is the source of truth. STATS.cumulative is only used
-  // before the first load, or if the migration has not run yet.
-  const base = OMNI_WATCHLOG.length ? OMNI_WATCHLOG
-    : ((typeof STATS !== 'undefined' && STATS.cumulative) ? STATS.cumulative : []);
+  const base = (typeof STATS !== 'undefined' && STATS.cumulative) ? STATS.cumulative : [];
   const have = new Set(base.map(e => omniNormTitle(e.title).toLowerCase()));
   // earliest review date per not-yet-listed film
   const firstReview = {};
@@ -3671,26 +3612,22 @@ function omniRatingsStats(){
 
 // ---- Rebuild + repaint. `persist` saves state to the Sheet. We also save when
 //      reconciliation genuinely changed the committed schedule.
-// renderOnly: paint the page but leave OMNI_STATE.committed alone. Used for the
-// early paint, when the scrape hasn't landed yet — the schedule built at that
-// point comes from the orphan rebuild and the embedded fallback, and writing it
-// into committed would destroy the stickiness the real build depends on.
-function omniApply(persist, renderOnly){
+function omniApply(persist){
   const { data, committedChanged } = omniBuildData();
   DATA = data;
-  if (!renderOnly) OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
+  OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
   try{buildWeekPage();}catch(e){} try{buildFuturePage();}catch(e){} try{buildScreeningsPage();}catch(e){}
   try{buildImpossiblePage();}catch(e){} try{buildKidsPage();}catch(e){} try{buildExcludedPage();}catch(e){}
   try{buildMissedPage();}catch(e){} try{buildStatsPage();}catch(e){}
   omniBuildDiaryPage(); omniBuildDataPage();
   try { omniReviewShortcut(); } catch(e){}
-  if ((persist || committedChanged) && OMNI_LOAD_DONE) omniSaveState();
+  if (persist || committedChanged) omniSaveState();
 }
 
 // ============================================================================
 //  PERSISTENCE — same webhook, split into small "state" and bulk "scrape"
 // ============================================================================
-async function omniLoadAll(onStateReady){
+async function omniLoadAll(){
   OMNI_STATE.watched     = (typeof STATS!=='undefined' && STATS.cumulative) ? STATS.cumulative.map(c=>c.title) : [];
   OMNI_STATE.doNotWatch  = (DATA.do_not_watch||[]).slice();
   OMNI_STATE.kidsRemoved = (DATA.kids_removed||[]).slice();
@@ -3698,25 +3635,14 @@ async function omniLoadAll(onStateReady){
   OMNI_STATE.committed   = (DATA.schedule||[]).map(omniSerialiseCommitted); // seed from embedded snapshot
 
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
-    ['state','scrape','fixtures','reviews','watchlog'].forEach(k => omniBootStep(k,'skip'));
+    ['state','scrape','fixtures','reviews'].forEach(k => omniBootStep(k,'skip'));
     omniBootFail('No webhook URL is set, so nothing can sync. The app still works on this device only.');
     omniConnBadge(false); return; }
-
-  // Fire every read at once instead of one after another. Apps Script is slow
-  // per request, so five in series was most of the wait.
-  const t = Date.now();
-  const grab = a => fetch(REVIEWS_WEBHOOK_URL + '?action=' + a + '&t=' + t)
-    .then(r => r.json()).catch(() => null);
-  const pState = grab('state'), pScrape = grab('scrape'),
-        pWatchlog = grab('watchlog'), pReviews = grab('get');
-  const pFixtures = omniLoadFixtures();
-
-  ['scrape','fixtures','watchlog','reviews'].forEach(k => omniBootStep(k,'running'));
 
   let ok = false, stateNote = 'unreachable', stale = false;
   omniBootStep('state','running');
   try {
-    const s = await pState;
+    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
     if (Array.isArray(s)){ stale = true; stateNote = 'out of date'; }
     else if (s && typeof s === 'object'){
       ok = true; stateNote = (s.committed||[]).length + ' films';
@@ -3729,17 +3655,11 @@ async function omniLoadAll(onStateReady){
       if (Array.isArray(s.sportRemoved)) OMNI_STATE.sportRemoved = s.sportRemoved;
     }
   } catch(e){}
-  OMNI_STATE_OK = ok;   // gate every write on this
   omniBootStep('state', ok ? 'ok' : (stale ? 'stale' : 'fail'), stateNote);
   if (ok) try { omniBootReviewOffer(OMNI_STATE.committed); } catch(e){}
-
-  // The diary and the committed schedule are in, so the calendar is now right.
-  // Get out of the user's way; the rest keeps loading behind the page.
-  if (ok && typeof onStateReady === 'function') { try { onStateReady(); } catch(e){} }
-
   let scrapeStep = { status:'fail', note:'unreachable' };
   try {
-    const sc = await pScrape;
+    const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape&t=' + Date.now())).json();
     if (Array.isArray(sc)){
       const real = sc.filter(f => f && f.title && f.showings);   // reviews have neither
       if (sc.length && !real.length) scrapeStep = { status:'stale', note:'Apps Script needs redeploying' };
@@ -3750,45 +3670,15 @@ async function omniLoadAll(onStateReady){
   omniBootStep('scrape', scrapeStep.status, scrapeStep.note);
   if (scrapeStep.status === 'stale') stale = true;
 
-  const fxStep = await pFixtures;
+  omniBootStep('fixtures','running');
+  const fxStep = await omniLoadFixtures();
   omniBootStep('fixtures', fxStep.status, fxStep.note);
   if (fxStep.status === 'stale') stale = true;
 
-  let wlNote = 'unreachable', wlStatus = 'fail', wlSave = false;
-  try {
-    const wl = await pWatchlog;
-    if (Array.isArray(wl)){
-      const real = wl.filter(e => e && e.title && e.date);   // an old deployment answers with reviews
-      if (wl.length && !real.length){ wlStatus = 'stale'; wlNote = 'Apps Script needs redeploying'; }
-      else {
-        OMNI_WATCHLOG = real;
-        if (!real.length && typeof STATS !== 'undefined' && STATS.cumulative && STATS.cumulative.length){
-          // one-time migration: lift the history out of this file and into the Sheet
-          OMNI_WATCHLOG = STATS.cumulative.map(c => ({ title: omniNormTitle(c.title), date: c.date }));
-          wlSave = true; wlStatus = 'ok'; wlNote = 'migrated ' + OMNI_WATCHLOG.length + ' films';
-        } else { wlStatus = 'ok'; wlNote = real.length + ' films'; }
-      }
-    }
-  } catch(e){}
-  omniBootStep('watchlog', wlStatus, wlNote);
-  if (wlStatus === 'stale') stale = true;
-  // The watch log ADDS to the watched list, it does not replace it. The Sheet's
-  // watched list is the exclusion list and can hold films with no recorded date
-  // (7 of them at the time of writing) — overwriting it would put those back on
-  // the schedule.
-  if (OMNI_WATCHLOG.length){
-    const haveW = new Set((OMNI_STATE.watched||[]).map(t => omniNormTitle(t).toLowerCase()));
-    OMNI_WATCHLOG.forEach(e => {
-      const t = omniNormTitle(e.title), k = t.toLowerCase();
-      if (!haveW.has(k)){ haveW.add(k); OMNI_STATE.watched.push(t); }
-    });
-  }
-
-  const addedFromReviews = await omniSyncReviewedWatched(await pReviews);
+  omniBootStep('reviews','running');
+  const addedFromReviews = await omniSyncReviewedWatched();
   omniBootStep('reviews', OMNI_REVIEW_REACHED ? 'ok' : 'fail',
                OMNI_REVIEW_REACHED ? (addedFromReviews ? '+'+addedFromReviews+' watched' : 'up to date') : '');
-  OMNI_LOAD_DONE = true;   // from here on, saving is allowed
-  if (wlSave && ok) omniSaveWatchlog();
 
   omniConnBadge(ok);
   if (!ok || stale){
@@ -3803,28 +3693,15 @@ async function omniLoadAll(onStateReady){
 // so it stops being scheduled. Returns how many were newly added.
 function omniNormTitle(t){ return String(t||'').split(' | ')[0].trim(); }
 let OMNI_REVIEW_REACHED = false;
-async function omniSyncReviewedWatched(prefetched){
+async function omniSyncReviewedWatched(){
   let reviews = null;
   OMNI_REVIEW_REACHED = false;
   try {
-    const r = (prefetched !== undefined && prefetched !== null)
-      ? prefetched
-      : await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
+    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
     if (Array.isArray(r)){ reviews = r; OMNI_REVIEW_REACHED = true; }
   } catch(e){ return 0; }
   if (!reviews) return 0;
   try { if (typeof _reviewCache !== 'undefined') _reviewCache = reviews; } catch(e){}
-  // A review means it was seen, so it belongs in the watch history too — dated
-  // by the earliest review of that film, not by today.
-  const firstSeen = {};
-  reviews.forEach(r => {
-    if (!r || !r.film) return;
-    const t = omniNormTitle(r.film), k = t.toLowerCase();
-    const d = omniIsoDate(r.date) || omniIsoDate(r.timestamp);
-    if (!d) return;
-    if (!firstSeen[k] || d < firstSeen[k].date) firstSeen[k] = { title:t, date:d };
-  });
-  if (omniWatchlogAdd(Object.values(firstSeen))) omniSaveWatchlog();
   return omniAbsorbReviewTitles(reviews.map(r => r && r.film));
 }
 function omniAbsorbReviewTitles(titles){
@@ -3858,7 +3735,6 @@ function omniReviewSaved(title){
     omniToast(`Review saved — “${omniNormTitle(title)}” will be marked watched once loading finishes`,'var(--new)');
     return;
   }
-  if (omniWatchlogAdd([{ title, date: omniToday() }])) omniSaveWatchlog();
   if (omniAbsorbReviewTitles([title]) > 0){
     omniApply(true);
     omniToast(`“${omniNormTitle(title)}” marked as watched`,'var(--new)');
@@ -3969,9 +3845,6 @@ async function omniRefreshFixtures(){
 function omniSaveState(){
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
     omniToast('Not connected to the Sheet — change is local only','var(--accent)'); return; }
-  if (!OMNI_STATE_OK){
-    omniToast("Not saved — the Sheet's state never loaded, so writing now would overwrite it",'var(--danger)');
-    omniSetStatus('unsaved'); return; }
   omniSaveBegin();
   fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ kind:'state', diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
@@ -3980,30 +3853,6 @@ function omniSaveState(){
     .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd(); })
     .catch(()=>{ omniToast('Save failed','var(--danger)'); omniSaveEnd(); });
 }
-// The watch history lives in the Sheet. Same rule as the state: never write
-// unless we know what is already there.
-function omniSaveWatchlog(){
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')) return;
-  if (!OMNI_STATE_OK) return;
-  omniSaveBegin();
-  fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'watchlog', entries:OMNI_WATCHLOG }) })
-    .then(omniSaveEnd).catch(omniSaveEnd);
-}
-
-// Add films to the watch history, dated. Returns how many were new.
-function omniWatchlogAdd(entries){
-  const have = new Set(OMNI_WATCHLOG.map(e => omniNormTitle(e.title).toLowerCase()));
-  let added = 0;
-  (entries||[]).forEach(e => {
-    const t = omniNormTitle(e && e.title); if (!t) return;
-    const k = t.toLowerCase(); if (have.has(k)) return;
-    have.add(k); OMNI_WATCHLOG.push({ title:t, date: e.date || omniToday() }); added++;
-  });
-  if (added) OMNI_WATCHLOG.sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-  return added;
-}
-
 function omniSaveScrape(films){
   if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')) return;
   omniSaveBegin();
@@ -4385,13 +4234,6 @@ function omniBuildDataPage(){
     <button onclick="omniUploadFixtures()" style="margin-left:8px;padding:8px 14px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:700;cursor:pointer;">Load fixtures</button>
     <div style="font-size:11px;color:var(--muted);margin:8px 0 10px;">Upload <code>wigan_home_fixtures.json</code> from the scraper. Warriors &amp; Athletic home games at the Brick Community Stadium block Conor for the whole day.</div>
     <button onclick="omniRefreshFixtures()" style="padding:7px 12px;border-radius:8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);font-weight:600;font-size:11.5px;cursor:pointer;">↻ Or check feeds in the Sheet</button></div>`;
-  const wlSrc = OMNI_WATCHLOG.length
-    ? `${OMNI_WATCHLOG.length} films in the Sheet's WatchLog tab — earliest ${OMNI_WATCHLOG[0].date}, latest ${OMNI_WATCHLOG[OMNI_WATCHLOG.length-1].date}`
-    : 'not loaded — the Stats tab is falling back to the snapshot built into this file';
-  html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
-    <div style="font-weight:700;margin-bottom:6px;">Watch history</div>
-    <div style="font-size:12px;color:var(--muted);">${wlSrc}</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:8px;">Everything on the Stats tab is worked out from this. It grows on its own as reviews come in — a review means the film was seen.</div></div>`;
   html+=omniListEditor('Watched (excluded)','watched',OMNI_STATE.watched);
   if (OMNI_REVIEW_ADDED.length) html+=`<div style="font-size:11px;color:var(--muted);margin:-8px 0 14px 4px;">↳ auto-added from reviews: ${OMNI_REVIEW_ADDED.map(omniEsc).join(', ')}</div>`;
   html+=omniListEditor('Do not watch','doNotWatch',OMNI_STATE.doNotWatch);
@@ -4671,15 +4513,7 @@ window.addEventListener('beforeunload', function(e){
 async function omniInit(){
   omniSetStatus('connecting');
   omniBootReviewOffer();                       // from the built-in snapshot, instantly
-
-  // As soon as the shared state arrives the calendar is correct, so drop the
-  // loading screen and render. The scrape, fixtures, watch log and reviews
-  // finish in the background and the page repaints when they do.
-  const addedFromReviews = await omniLoadAll(() => {
-    omniBootHide();
-    try { omniApply(false, true); } catch(e){}   // render only — see omniApply
-    try { omniOpenFromHash(); } catch(e){}
-  });
+  const addedFromReviews = await omniLoadAll();
   const queued = OMNI_REVIEW_QUEUE.splice(0);  // reviews done while we were loading
   const absorbed = omniAbsorbReviewTitles(queued);
   if (OMNI_ONLINE) omniBootHide();   // problems keep the overlay up with an explanation
@@ -4702,9 +4536,6 @@ buildMissedPage();
 buildStatsPage();
 buildReviewsPage();
 buildFixturesPage();
-
-// Honour #review / #calendar straight away, before any network call.
-try { omniOpenFromHash(); } catch(e){}
 
 omniInit();
 </script>
