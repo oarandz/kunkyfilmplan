@@ -809,7 +809,9 @@
     font-family: var(--display); font-weight: 800; font-size: 22px;
     letter-spacing: 1.6px; color: var(--text); margin-bottom: 4px;
   }
-  .boot-sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; }
+  .boot-sub { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .boot-build { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.8px;
+    color: var(--muted); opacity: 0.7; margin-bottom: 18px; text-transform: uppercase; }
   .boot-sub::after { content: '…'; }
   .boot-sub.done::after { content: ''; }
   .boot-step {
@@ -880,7 +882,8 @@
       <path d="M6.1 8.3v7.4M17.9 8.3v7.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
     </svg>
     <div class="boot-title">OMNISCHEDULE</div>
-    <div class="boot-sub" id="boot-sub">Connecting to the Sheet</div>
+    <div class="boot-sub" id="boot-sub">Connecting to Supabase</div>
+    <div class="boot-build" id="boot-build"></div>
     <div class="boot-steps">
       <div class="boot-step" id="bs-state"><i></i><span>Shared state</span><em></em></div>
       <div class="boot-step" id="bs-scrape"><i></i><span>Screenings log</span><em></em></div>
@@ -2084,7 +2087,76 @@ function drawBarChart(canvasId, labels, values) {
 const ALL_FILM_TITLES = ["After The Hunt", "Akira (Re Release) (Subtitled)", "Alices Adventures In Wonderland - LIVE - The Royal Ballet 26-27", "Alpha (Hindi)", "Anaconda", "Andre Rieu's 2026 Summer Concert: Viva Maastricht!", "Anemone", "Back To The Future (40th Anniversary)", "Backrooms", "Backrooms: Everything Must Go Edition with Bonus Footage", "Bridget Jones's Diary (25th Anniversary)", "Bring Her Back", "Bugonia", "Carmen - LIVE- The Royal Opera 26-27", "Caught Stealing", "Cold Storage", "Cosi Fan Tutte - LIVE - The Royal Opera 26-27", "Crime 101", "Dead of Winter", "Disclosure Day", "Dragonfly", "EPiC: Elvis Presley in Concert", "Eternity", "Evil Dead Burn", "Exit 8", "Fackham Hall", "Finding Emily", "Five Nights at Freddy\u2019s 2", "Fuze", "Glenrothan", "Good Boy", "Good Fortune", "Good Luck, Have Fun, Don\u2019t Die", "Gotterdammerung - LIVE - The Royal Opera 26-27", "H Is for Hawk", "Hamnet", "Hokum", "Honey Don\u2019t!", "How to Make a Killing", "I Swear", "Iron Lung", "Jackass: Best and Last", "Keeper", "La Fanciulla Del West - The Met Opera 26-27", "Lee Cronin's The Mummy", "Macbeth - The Met Opera 2026-27", "Manon - LIVE - The Royal Ballet 26-27", "Marty Supreme", "Masters Of The Universe", "Materialists", "Mercy", "Michael", "Minions & Monsters", "Moana", "Moana (Sing along)", "Mortal Kombat II", "Mothers Pride", "Musik", "MyOmniPass Member Only Mystery Screening", "NT Live: The Misanthrope", "Nirvanna: The Band - The Show - The Movie", "Nobody 2", "Normal", "Now You See Me: Now You Don\u2019t", "Nuremberg", "Obsession", "One Battle After Another - Oscar Season", "Passenger", "Power Ballad", "Predator: Badlands", "Primate", "Project Hail Mary", "Ready or Not 2: Here I Come", "Regretting You", "Reminders of Him", "Return to Silent Hill", "Romeo & Juliet - LIVE - The Royal Ballet 26-27", "Roofman", "Saipan (GB)", "Scary Movie", "Scream 7", "Secret Screening", "Send Help", "Sentimental Value", "Shelby Oaks", "Shelter", "Sinners - Oscar Season", "Song Sung Blue", "Spider-Man: Brand New Day", "Springsteen: Deliver Me from Nowhere", "Star Wars: The Mandalorian and Grogu", "Strangers: Chapter 3", "Supergirl", "Swan Lake - LIVE - The Royal Ballet 26-27", "Taylor Swift: The Official Release Party of a Showgirl", "The Black Phone 2", "The Bride!", "The Conjuring: Last Rites", "The Devil Wears Prada 2", "The Drama", "The Good Boy", "The History of Sound", "The Housemaid", "The Invite", "The Life of Chuck", "The Long Walk", "The Naked Gun", "The Nutcracker - LIVE - The Royal Ballet 26-27", "The Odyssey", "The Polar Express (2004) (Christmas Bring it Back)", "The Roses", "The Running Man", "The Sheep Detectives", "The Smashing Machine", "The Strangers: Chapter 2", "The Super Mario Galaxy Movie", "They Will Kill You", "Together", "Tosca - LIVE - The Royal Opera 26-27", "Toy Story 5", "Tron: Ares", "Tuner", "Undertone", "Wake Up Dead Man: A Knives Out Mystery", "Weapons", "Whistle", "Wicked: For Good", "Wuthering Heights", "Years Later: Bone Temple", "You, Me & Tuscany"];
 
 // Google Apps Script Web App URL — set this after deploying your script
-const REVIEWS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbweQK5hHzlsfOCrKNivwW60ShwAUDb_d4wFEALf4999Vg83r0GeMyrbcdqltAsfjUc3pw/exec';
+// ============================================================================
+//  SUPABASE — the app's backend. Paste your TWO values between the quotes:
+//    1. Project URL   (Supabase dashboard ▸ Settings ▸ API ▸ Project URL)
+//    2. anon public key (same page ▸ Project API keys ▸ anon public)
+// ============================================================================
+const SUPABASE_URL      = 'https://hdppbnobyrmxelgatuna.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_VwwffWGXoo7Q1gG1zQg1BQ_vttujSOd';
+// ============================================================================
+
+function sbConfigured(){
+  return /^https:\/\/.+\.supabase\.co$/.test(String(SUPABASE_URL).replace(/\/$/,'')) && String(SUPABASE_ANON_KEY).length > 30;
+}
+// One tiny wrapper for every call. Unlike the old no-cors webhook, responses
+// are READABLE — a failed write is a real error we can show, not a mystery.
+async function sb(path, opts){
+  opts = opts || {};
+  const base = { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' };
+  // Legacy anon keys are JWTs and ride in Authorization too. The new-format
+  // publishable keys (sb_publishable_...) must be sent on apikey ONLY — per
+  // Supabase's API-key docs, they are not JWTs and don't belong in a Bearer.
+  if (!/^sb_/.test(String(SUPABASE_ANON_KEY)))
+    base['Authorization'] = 'Bearer ' + SUPABASE_ANON_KEY;
+  const headers = Object.assign(base, opts.headers || {});
+  const res = await fetch(String(SUPABASE_URL).replace(/\/$/,'') + '/rest/v1/' + path,
+    Object.assign({}, opts, { headers }));
+  if (!res.ok){
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); msg = j.message || j.hint || msg; } catch(e){}
+    const err = new Error(msg); err.status = res.status; throw err;
+  }
+  if (res.status === 204) return null;
+  const t = await res.text();
+  return t ? JSON.parse(t) : null;
+}
+const sbGetState    = () => sb('omni_state?id=eq.1&select=data').then(r => (r && r[0]) ? r[0].data : null);
+const sbGetScrape   = () => sb('scrape?select=title,event_code,rating,genres,info_url,showings&order=title.asc');
+const sbGetFixtures = () => sb('fixtures?select=*&order=date.asc');
+const sbGetReviews  = () => sb('reviews?select=*&order=timestamp.asc');
+const sbSaveState   = (data) => sb('omni_state?id=eq.1',
+  { method:'PATCH', headers:{'Prefer':'return=minimal'},
+    body: JSON.stringify({ data, updated_at: new Date().toISOString() }) });
+async function sbReplaceScrape(films){
+  await sb('scrape?title=not.is.null', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+  for (let i = 0; i < films.length; i += 50)
+    await sb('scrape', { method:'POST', headers:{'Prefer':'return=minimal'},
+      body: JSON.stringify(films.slice(i,i+50).map(f => ({ title:f.title, event_code:f.event_code||'',
+        rating:f.rating||'', genres:f.genres||[], info_url:f.info_url||'', showings:f.showings||[] }))) });
+}
+async function sbReplaceFixtures(list){
+  // rows added by hand in Supabase with source = 'manual' are never touched
+  await sb('fixtures?source=neq.manual', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+  const rows = (list||[]).filter(f => String(f.source).toLowerCase() !== 'manual')
+    .map(f => ({ date:f.date, time:f.time||'', sport:f.sport||'', home:f.home||'', away:f.away||'',
+      competition:f.competition||'', venue:f.venue||'', blocks:f.blocks||'Conor', source:f.source||'upload' }));
+  for (let i = 0; i < rows.length; i += 50)
+    await sb('fixtures', { method:'POST', headers:{'Prefer':'return=minimal'}, body: JSON.stringify(rows.slice(i,i+50)) });
+}
+async function sbWriteScheduleMirror(committed){
+  await sb('schedule_mirror?film=not.is.null', { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+  const rows = (committed||[]).map(c => ({ date:(c.showing||{}).date||'', day:(c.showing||{}).day||'',
+    time:(c.showing||{}).start||'', screen:(c.showing||{}).screen||'', film:c.title,
+    who:((c.showing||{}).attendees||[]).join(', '), locked: c.fixed_date ? 'yes' : '' }));
+  if (rows.length)
+    await sb('schedule_mirror', { method:'POST', headers:{'Prefer':'return=minimal'}, body: JSON.stringify(rows) });
+}
+const sbInsertReview = (row) => sb('reviews', { method:'POST', headers:{'Prefer':'return=minimal'}, body: JSON.stringify(row) });
+const sbMatchReview  = (person, film, raw) =>
+  'reviews?person=eq.' + encodeURIComponent(person) + '&film=eq.' + encodeURIComponent(film) + '&raw=eq.' + encodeURIComponent(String(raw).trim());
+const sbDeleteReview = (person, film, raw) => sb(sbMatchReview(person, film, raw), { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+const sbEditReview   = (person, film, raw, patch) => sb(sbMatchReview(person, film, raw), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body: JSON.stringify(patch) });
 
 const CATEGORIES = [
   { id: 'enjoyment',    label: 'Enjoyment',                weight: 0.20, desc: 'How much, regardless of anything else, you enjoyed the film. Did it grip you, affect you or make you feel something?' },
@@ -2246,8 +2318,8 @@ function buildReviewsPage() {
   updateScorePreview();
 
   // Pre-fetch reviews so duplicate check and dropdown colouring work immediately
-  if (!_reviewCache && REVIEWS_WEBHOOK_URL && REVIEWS_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
-    fetch(REVIEWS_WEBHOOK_URL + '?action=get').then(r => r.json()).then(d => { _reviewCache = d; }).catch(() => {});
+  if (!_reviewCache && sbConfigured()) {
+    sbGetReviews().then(d => { sanitiseReviews(d); _reviewCache = d; }).catch(() => {});
   }
 
   // Close dropdown on outside click
@@ -2273,10 +2345,9 @@ function showReviewSection(section) {
 
 async function onPersonChange() {
   // Pre-load reviews so dropdown can colour reviewed films
-  if (!_reviewCache && REVIEWS_WEBHOOK_URL && REVIEWS_WEBHOOK_URL !== 'YOUR_APPS_SCRIPT_URL_HERE') {
+  if (!_reviewCache && sbConfigured()) {
     try {
-      const res = await fetch(REVIEWS_WEBHOOK_URL + '?action=get');
-      const d = await res.json();
+      const d = await sbGetReviews();
       sanitiseReviews(d);
       _reviewCache = d;
     } catch(e) {}
@@ -2401,26 +2472,26 @@ function submitReview() {
 
   const payload = { person, film, date: dateVal, notes, scores, raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct, timestamp: new Date().toISOString() };
 
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
-    setRevStatus('Google Sheets not connected yet — see setup instructions. Score: ' + raw.toFixed(2) + '/5', 'var(--accent)');
+  if (!sbConfigured()) {
+    setRevStatus('Supabase not connected yet — see setup instructions. Score: ' + raw.toFixed(2) + '/5', 'var(--accent)');
     console.log('Review data (would be sent):', JSON.stringify(payload, null, 2));
     return;
   }
 
   setRevStatus('Saving...', 'var(--muted)');
   if (typeof omniSaveBegin === 'function') omniSaveBegin();
-  fetch(REVIEWS_WEBHOOK_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
+  sbInsertReview({
+    timestamp: payload.timestamp, person, film, date: dateVal || null, notes: notes || '',
+    enjoyment: scores.enjoyment, story: scores.story, characters: scores.characters,
+    craft: scores.craft, atmosphere: scores.atmosphere, ideas: scores.ideas,
+    originality: scores.originality, raw: payload.raw, rounded: payload.rounded, pct
   }).then(() => {
     setRevStatus('✓ Review saved!', 'var(--new)');
     _reviewCache = null; // invalidate cache
     try { omniReviewSaved(payload.film); } catch(e) {}   // reviewed = watched
     if (typeof omniSaveEnd === 'function') omniSaveEnd();
   }).catch(e => {
-    setRevStatus('Error saving: ' + e.message, 'var(--danger)');
+    setRevStatus('Save FAILED: ' + e.message, 'var(--danger)');   // readable at last
     if (typeof omniSaveEnd === 'function') omniSaveEnd();
   });
 }
@@ -2453,13 +2524,12 @@ async function loadProfile(person) {
   const container = document.getElementById('profile-content');
   container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);">Loading ${person}'s reviews...</div>`;
 
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
-    container.innerHTML = `<div class="note-box">Google Sheets not connected yet.</div>`;
+  if (!sbConfigured()) {
+    container.innerHTML = `<div class="note-box">Supabase not connected yet.</div>`;
     return;
   }
   try {
-    const res = await fetch(REVIEWS_WEBHOOK_URL + '?action=get');
-    const data = await res.json();
+    const data = await sbGetReviews();
     sanitiseReviews(data);
     _reviewCache = data;
     renderProfile(person, data);
@@ -2613,9 +2683,12 @@ async function saveEditReview(rowId, person) {
   });
 
   try {
-    const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
-    const text = await res.text();
-    console.log('Edit response:', text);
+    await sbEditReview(person, review.film, review.raw, {
+      timestamp: new Date().toISOString(), notes: notes || '',
+      enjoyment: scores.enjoyment, story: scores.story, characters: scores.characters,
+      craft: scores.craft, atmosphere: scores.atmosphere, ideas: scores.ideas,
+      originality: scores.originality, raw: raw.toFixed(2), rounded: rounded.toFixed(1), pct
+    });
     _reviewCache = null;
     await loadProfile(person);
   } catch(e) {
@@ -2636,15 +2709,9 @@ async function deleteReview(idx, person) {
   });
 
   try {
-    const res = await fetch(REVIEWS_WEBHOOK_URL + '?' + params.toString());
-    const text = await res.text();
-    console.log('Delete response:', text);
-    if (res.ok) {
-      _reviewCache = null;
-      await loadProfile(person);
-    } else {
-      alert('Unexpected response: ' + text);
-    }
+    await sbDeleteReview(person, review.film, review.raw);
+    _reviewCache = null;
+    await loadProfile(person);
   } catch(e) {
     alert('Error deleting: ' + e.message);
   }
@@ -2676,15 +2743,14 @@ function setReviewFilter(filter) {
 
 async function loadReviews() {
   const container = document.getElementById('rev-table-container');
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL === 'YOUR_APPS_SCRIPT_URL_HERE') {
-    container.innerHTML = `<div class="note-box">Google Sheets not connected yet. Once set up, reviews will appear here ranked best to worst.</div>`;
+  if (!sbConfigured()) {
+    container.innerHTML = `<div class="note-box">Supabase not connected yet. Once set up, reviews will appear here ranked best to worst.</div>`;
     return;
   }
   if (_reviewCache) { renderReviewTable(_reviewCache); return; }
   container.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted);">Loading...</div>`;
   try {
-    const res = await fetch(REVIEWS_WEBHOOK_URL + '?action=get');
-    const data = await res.json();
+    const data = await sbGetReviews();
     sanitiseReviews(data);
     _reviewCache = data;
     renderReviewTable(data);
@@ -3137,6 +3203,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
+const OMNI_BUILD = 'r27 · supabase';
 const OMNI_RULES = {
   people: ['Owen', 'Conor', 'Alice'],
   owenSundayAfter: '15:00',
@@ -3634,17 +3701,16 @@ async function omniLoadAll(){
   OMNI_STATE.sportRemoved= (DATA.sport_removed||[]).slice();
   OMNI_STATE.committed   = (DATA.schedule||[]).map(omniSerialiseCommitted); // seed from embedded snapshot
 
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
+  if (!sbConfigured()){
     ['state','scrape','fixtures','reviews'].forEach(k => omniBootStep(k,'skip'));
-    omniBootFail('No webhook URL is set, so nothing can sync. The app still works on this device only.');
+    omniBootFail('Supabase URL and key are not set in this file yet — search the HTML for <code>PASTE_YOUR</code> and paste both values from your project\'s Settings ▸ API page. Until then the app works on this device only.');
     omniConnBadge(false); return; }
 
-  let ok = false, stateNote = 'unreachable', stale = false;
+  let ok = false, stateNote = 'unreachable', stale = false, missingTables = false;
   omniBootStep('state','running');
   try {
-    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
-    if (Array.isArray(s)){ stale = true; stateNote = 'out of date'; }
-    else if (s && typeof s === 'object'){
+    const s = await sbGetState();
+    if (s && typeof s === 'object'){
       ok = true; stateNote = (s.committed||[]).length + ' films';
       if (Array.isArray(s.diary)) OMNI_STATE.diary = s.diary;
       if (Array.isArray(s.locks)) OMNI_STATE.locks = s.locks;
@@ -3653,20 +3719,18 @@ async function omniLoadAll(){
       if (Array.isArray(s.doNotWatch)) OMNI_STATE.doNotWatch = s.doNotWatch;
       if (Array.isArray(s.kidsRemoved)) OMNI_STATE.kidsRemoved = s.kidsRemoved;
       if (Array.isArray(s.sportRemoved)) OMNI_STATE.sportRemoved = s.sportRemoved;
-    }
-  } catch(e){}
-  omniBootStep('state', ok ? 'ok' : (stale ? 'stale' : 'fail'), stateNote);
+    } else { ok = true; stateNote = 'empty — first run'; }
+  } catch(e){ stateNote = e.message; if (e.status === 404) missingTables = true; }
+  omniBootStep('state', ok ? 'ok' : 'fail', stateNote);
   if (ok) try { omniBootReviewOffer(OMNI_STATE.committed); } catch(e){}
   let scrapeStep = { status:'fail', note:'unreachable' };
   try {
-    const sc = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=scrape&t=' + Date.now())).json();
+    const sc = await sbGetScrape();
     if (Array.isArray(sc)){
-      const real = sc.filter(f => f && f.title && f.showings);   // reviews have neither
-      if (sc.length && !real.length) scrapeStep = { status:'stale', note:'Apps Script needs redeploying' };
-      else if (real.length){ OMNI_SCRAPE = real; scrapeStep = { status:'ok', note: real.length + ' films' }; }
+      if (sc.length){ OMNI_SCRAPE = sc; scrapeStep = { status:'ok', note: sc.length + ' films' }; }
       else scrapeStep = { status:'skip', note:'nothing stored yet' };
     }
-  } catch(e){}
+  } catch(e){ scrapeStep.note = e.message; if (e.status === 404) missingTables = true; }
   omniBootStep('scrape', scrapeStep.status, scrapeStep.note);
   if (scrapeStep.status === 'stale') stale = true;
 
@@ -3681,10 +3745,10 @@ async function omniLoadAll(){
                OMNI_REVIEW_REACHED ? (addedFromReviews ? '+'+addedFromReviews+' watched' : 'up to date') : '');
 
   omniConnBadge(ok);
-  if (!ok || stale){
-    omniBootFail(stale
-      ? 'The Sheet answered, but the Apps Script running there is an <b>older version</b>, so the new endpoints are missing.<br><br>Fix: Apps Script ▸ <b>Deploy ▸ Manage deployments ▸</b> edit the Web App ▸ <b>Version: New version ▸ Deploy</b>.<br><br>Check with:<br><code>' + REVIEWS_WEBHOOK_URL + '?action=state</code>'
-      : "The Sheet didn't respond. It may be the deployment URL, sharing settings, or your connection.<br><br>Check with:<br><code>" + REVIEWS_WEBHOOK_URL + '?action=state</code>');
+  if (!ok || missingTables){
+    omniBootFail(missingTables
+      ? 'Supabase answered, but the tables are missing — the schema hasn\'t been run on this project yet.<br><br>Fix: Supabase dashboard ▸ <b>SQL Editor ▸ New query</b> ▸ paste <code>supabase_schema.sql</code> ▸ <b>Run</b>. Then reload.'
+      : 'Supabase didn\'t respond. Check the Project URL and anon key pasted into this file, and your connection. Free-tier projects also pause after a week of inactivity — open your Supabase dashboard and press <b>Restore</b> if so.');
   }
   return addedFromReviews;
 }
@@ -3697,8 +3761,8 @@ async function omniSyncReviewedWatched(){
   let reviews = null;
   OMNI_REVIEW_REACHED = false;
   try {
-    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=get&t=' + Date.now())).json();
-    if (Array.isArray(r)){ reviews = r; OMNI_REVIEW_REACHED = true; }
+    const r = await sbGetReviews();
+    if (Array.isArray(r)){ sanitiseReviews(r); reviews = r; OMNI_REVIEW_REACHED = true; }
   } catch(e){ return 0; }
   if (!reviews) return 0;
   try { if (typeof _reviewCache !== 'undefined') _reviewCache = reviews; } catch(e){}
@@ -3793,27 +3857,24 @@ function omniUploadFixtures(){
 }
 
 function omniSaveFixtures(list){
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
+  if (!sbConfigured()){
     omniToast('Not connected — fixtures are local only','var(--accent)'); return; }
   omniSaveBegin();
-  fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'fixtures', fixtures:list }) }).then(omniSaveEnd).catch(omniSaveEnd);
+  sbReplaceFixtures(list)
+    .then(()=>omniSaveEnd())
+    .catch(e=>{ omniToast('Fixture save FAILED: '+e.message,'var(--danger)'); omniSaveEnd(); });
 }
 
 // Pull the live home-fixture list and mirror it into the Fixtures tab.
 async function omniLoadFixtures(){
   let status = 'fail', note = '';
   try {
-    const fx = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=fixtures&t=' + Date.now())).json();
+    const fx = await sbGetFixtures();
     if (Array.isArray(fx)){
-      // An out-of-date deployment answers unknown actions with the REVIEWS list,
-      // and reviews also carry a `date` — so require a fixture-shaped row.
-      const real = fx.filter(f => f && f.date && (f.home || f.home_team || f.sport));
-      const looksLikeReviews = fx.length && !real.length;
-      if (looksLikeReviews){ status='stale'; note='Apps Script needs redeploying'; }
-      else { OMNI_FIXTURES = real; status='ok'; note = real.length + ' home games'; }
+      OMNI_FIXTURES = fx.filter(f => f && f.date);
+      status = 'ok'; note = OMNI_FIXTURES.length + ' home games';
     }
-  } catch(e){ note = 'unreachable'; }
+  } catch(e){ note = e.message || 'unreachable'; }
   omniSyncFixtureDisplay();
   return { status, note };
 }
@@ -3831,33 +3892,32 @@ function omniSyncFixtureDisplay(){
 
 // Ask the backend to re-scrape the fixture feeds now, then reload.
 async function omniRefreshFixtures(){
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
-    omniToast('Not connected to the Sheet','var(--danger)'); return; }
-  omniToast('Checking fixture feeds…','var(--accent)');
+  if (!sbConfigured()){ omniToast('Not connected to Supabase','var(--danger)'); return; }
+  omniToast('Reloading fixtures…','var(--accent)');
   try {
-    const r = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=refreshfixtures')).json();
     await omniLoadFixtures();
-    omniApply(true);
-    omniToast(r && r.result ? String(r.result) : 'Fixtures refreshed','var(--new)');
-  } catch(e){ omniToast('Fixture refresh failed','var(--danger)'); }
+    omniApply(false);
+    omniToast(OMNI_FIXTURES.length + ' home games loaded','var(--new)');
+  } catch(e){ omniToast('Fixture reload failed','var(--danger)'); }
 }
 
 function omniSaveState(){
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')){
-    omniToast('Not connected to the Sheet — change is local only','var(--accent)'); return; }
+  if (!sbConfigured()){
+    omniToast('Not connected to Supabase — change is local only','var(--accent)'); return; }
   omniSaveBegin();
-  fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'state', diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
+  sbSaveState({ diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
       committed:OMNI_STATE.committed, watched:OMNI_STATE.watched, doNotWatch:OMNI_STATE.doNotWatch,
-      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved }) })
-    .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd(); })
-    .catch(()=>{ omniToast('Save failed','var(--danger)'); omniSaveEnd(); });
+      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved })
+    .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd();
+      sbWriteScheduleMirror(OMNI_STATE.committed).catch(()=>{}); })
+    .catch(e=>{ omniToast('Save FAILED: '+e.message,'var(--danger)'); omniSetStatus('unsaved'); omniSaveEnd(); });
 }
 function omniSaveScrape(films){
-  if (!REVIEWS_WEBHOOK_URL || REVIEWS_WEBHOOK_URL.includes('YOUR_APPS_SCRIPT')) return;
+  if (!sbConfigured()) return;
   omniSaveBegin();
-  fetch(REVIEWS_WEBHOOK_URL, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ kind:'scrape', films }) }).then(omniSaveEnd).catch(omniSaveEnd);
+  sbReplaceScrape(films)
+    .then(()=>omniSaveEnd())
+    .catch(e=>{ omniToast('Screenings save FAILED: '+e.message,'var(--danger)'); omniSaveEnd(); });
 }
 
 // ---- boot overlay -------------------------------------------------------
@@ -3912,8 +3972,8 @@ async function omniVerifySync(attempt){
   attempt = attempt || 1;
   if (!OMNI_ONLINE) { omniSetStatus('local'); return; }
   try {
-    const s = await (await fetch(REVIEWS_WEBHOOK_URL + '?action=state&t=' + Date.now())).json();
-    if (!s || Array.isArray(s)) { omniSetStatus('offline'); return; }
+    const s = await sbGetState();
+    if (!s || typeof s !== 'object') { omniSetStatus('offline'); return; }
     const mine = omniFingerprint(OMNI_STATE), theirs = omniFingerprint(s);
     if (mine !== theirs && attempt < 3){          // give the write time to land
       omniSetStatus('saving');
@@ -4239,6 +4299,7 @@ function omniBuildDataPage(){
   html+=omniListEditor('Do not watch','doNotWatch',OMNI_STATE.doNotWatch);
   html+=omniListEditor('Kids removed','kidsRemoved',OMNI_STATE.kidsRemoved);
   html+=omniListEditor('Sport / event removed','sportRemoved',OMNI_STATE.sportRemoved);
+  html+=`<div style="font-family:var(--mono);font-size:10px;letter-spacing:0.8px;color:var(--muted);opacity:.7;text-align:center;padding:6px 0 2px;">BUILD ${OMNI_BUILD.toUpperCase()}</div>`;
   el.innerHTML=html;
 }
 function omniEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -4511,6 +4572,8 @@ window.addEventListener('beforeunload', function(e){
 });
 
 async function omniInit(){
+  try { console.log('Omnischedule build', OMNI_BUILD);
+    const bb = document.getElementById('boot-build'); if (bb) bb.textContent = 'build ' + OMNI_BUILD; } catch(e){}
   omniSetStatus('connecting');
   omniBootReviewOffer();                       // from the built-in snapshot, instantly
   const addedFromReviews = await omniLoadAll();
