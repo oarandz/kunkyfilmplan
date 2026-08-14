@@ -3203,7 +3203,51 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r27 · supabase';
+const OMNI_BUILD = 'r28 · supabase';
+
+// ---- ntfy push notifications --------------------------------------------
+// Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
+// Set NTFY_ENABLED to false to turn all pushes off.
+const NTFY_ENABLED = true;
+const NTFY_TOPIC   = 'omnischedule-wgn-e83k1r7q';
+function omniNotify(title, body, tags){
+  if (!NTFY_ENABLED || !NTFY_TOPIC) return;
+  try {
+    fetch('https://ntfy.sh/' + NTFY_TOPIC, {
+      method: 'POST',
+      body: body || title,
+      headers: Object.assign({ 'Title': title }, tags ? { 'Tags': tags } : {}),
+    }).catch(()=>{});
+  } catch(e){}
+}
+function omniNtfyDate(d){
+  const dt = parseDateStr(d);
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()] + ' ' + dt.getDate() + ' ' +
+    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+}
+// Diff the committed schedule around a rebuild and push the differences.
+// Quiet during boot: catching up on someone else's saved changes isn't news —
+// the device that MADE a change is the one that announces it.
+function omniNotifySchedule(prev, schedule){
+  if (typeof OMNI_BOOTING !== 'undefined' && OMNI_BOOTING) return;
+  const watched = new Set(OMNI_STATE.watched.map(t => t.toLowerCase()));
+  const next = {}; schedule.forEach(f => next[f.title] = f.showing);
+  const moved = [], added = [];
+  for (const t in next){
+    const s = next[t], p = prev[t];
+    if (!p) added.push(t + ' — ' + omniNtfyDate(s.date) + ' ' + s.start);
+    else if (p.date !== s.date || p.start !== s.start)
+      moved.push(t + ': ' + omniNtfyDate(p.date) + ' ' + p.start + ' → ' + omniNtfyDate(s.date) + ' ' + s.start);
+  }
+  const dropped = Object.keys(prev).filter(t => !next[t] && !watched.has(t.toLowerCase()));
+  if (!moved.length && !added.length && !dropped.length) return;
+  const cap = (arr, label) => arr.length
+    ? label + '\n' + arr.slice(0,6).join('\n') + (arr.length > 6 ? '\n+' + (arr.length-6) + ' more' : '')
+    : '';
+  const body = [cap(moved,'Moved:'), cap(added,'Now scheduled:'), cap(dropped,'No slot any more:')]
+    .filter(Boolean).join('\n\n');
+  omniNotify('Schedule updated', body, 'calendar');
+}
 const OMNI_RULES = {
   people: ['Owen', 'Conor', 'Alice'],
   owenSundayAfter: '15:00',
@@ -3488,6 +3532,46 @@ function omniBuildData(){
       if (!commitByTitle[f.title]) committedChanged = true; }
     else if (commitByTitle[f.title]) committedChanged = true;
   }
+  // 4) improvement pass — two jobs, one mechanism:
+  //    a) if a day someone freed up (diary change) lets a film move EARLIER onto
+  //       an empty day, pull it back;
+  //    b) if two films share a day but one of them has any other empty
+  //       schedulable day, spread them out (one film per day unless necessary).
+  //    Locked films never move.
+  {
+    const dayCount = {};
+    Object.values(decided).forEach(d => { dayCount[d.showing.date] = (dayCount[d.showing.date]||0)+1; });
+    const rank = (a,b) =>
+      (b.all_can_watch - a.all_can_watch) ||
+      (b.attendees.length - a.attendees.length) ||
+      (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) ||
+      (omniToMins(b.start) - omniToMins(a.start));
+    const order = Object.keys(decided).filter(t => !decided[t].locked)
+      .sort((a,b)=>{ const A=decided[a].showing, B=decided[b].showing;
+        return A.date<B.date?-1:A.date>B.date?1:omniToMins(A.start)-omniToMins(B.start); });
+    for (const title of order){
+      const cur = decided[title].showing;
+      const f = candByTitle[title]; if (!f) continue;
+      const shared = dayCount[cur.date] > 1;
+      const others = taken.filter(t => t !== cur);
+      const opts = f.showings.filter(s =>
+        s !== cur && omniSchedulable(s) &&
+        !dayCount[s.date] &&                        // target day must be empty
+        !others.some(t => omniOverlap(t, s)) &&
+        (shared || s.date < cur.date));             // spread, or strictly earlier
+      if (!opts.length) continue;
+      opts.sort(rank);
+      const best = opts[0];
+      if (!shared && best.date >= cur.date) continue;
+      dayCount[cur.date]--; if (!dayCount[cur.date]) delete dayCount[cur.date];
+      dayCount[best.date] = (dayCount[best.date]||0) + 1;
+      const i = taken.indexOf(cur); if (i >= 0) taken.splice(i, 1);
+      taken.push(best);
+      decided[title] = { showing: best, locked: false };
+      committedChanged = true;
+    }
+  }
+
   for (const c of OMNI_STATE.committed){ if (!candByTitle[c.title]) committedChanged = true; }
 
   const schedule = Object.keys(decided).map(title => {
@@ -3680,9 +3764,12 @@ function omniRatingsStats(){
 // ---- Rebuild + repaint. `persist` saves state to the Sheet. We also save when
 //      reconciliation genuinely changed the committed schedule.
 function omniApply(persist){
+  const prevSlots = {};
+  (OMNI_STATE.committed||[]).forEach(c => { if (c && c.showing) prevSlots[c.title] = { date:c.showing.date, start:c.showing.start }; });
   const { data, committedChanged } = omniBuildData();
   DATA = data;
   OMNI_STATE.committed = data.schedule.map(omniSerialiseCommitted);
+  if (committedChanged) try { omniNotifySchedule(prevSlots, data.schedule); } catch(e){}
   try{buildWeekPage();}catch(e){} try{buildFuturePage();}catch(e){} try{buildScreeningsPage();}catch(e){}
   try{buildImpossiblePage();}catch(e){} try{buildKidsPage();}catch(e){} try{buildExcludedPage();}catch(e){}
   try{buildMissedPage();}catch(e){} try{buildStatsPage();}catch(e){}
@@ -4368,8 +4455,13 @@ function omniUploadScrape(){
   r.onload=()=>{ try{ let j=JSON.parse(r.result);
     if(!Array.isArray(j)) j=j.films||j.schedule||j.all_films||[];
     if(!Array.isArray(j)||!j.length) throw new Error('no films found');
+    const before = new Set((OMNI_SCRAPE||[]).map(f=>f.title));
     const { merged, newScreen, newFilms } = omniMergeScrape(j);
+    const brandNew = merged.filter(f=>!before.has(f.title)).map(f=>f.title);
     OMNI_SCRAPE=merged; omniSaveScrape(merged); omniApply(true);
+    if (before.size && brandNew.length)   // quiet on a first-ever upload
+      omniNotify('New films at the Omniplex',
+        brandNew.slice(0,10).join('\n') + (brandNew.length>10 ? '\n+'+(brandNew.length-10)+' more' : ''), 'clapper');
     const bits=[];
     if(newScreen) bits.push(`+${newScreen} new screening${newScreen>1?'s':''}`);
     if(newFilms)  bits.push(`+${newFilms} new film${newFilms>1?'s':''}`);
