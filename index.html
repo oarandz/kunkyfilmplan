@@ -796,7 +796,8 @@
   @media (max-width: 480px) { #omni-review-jump .rj-main { max-width: 180px; } }
 
   /* --- FILM CARD AFFORDANCE ------------------------------------------------ */
-  .film-name, .kids-name { cursor: pointer; }
+  .film-name, .kids-name, .film-title-row, .film-card, .future-film-card,
+  .impossible-card, .kids-card { cursor: pointer; }
   .film-name:hover, .kids-name:hover { text-decoration: underline; text-decoration-color: rgba(255,212,71,.5); text-underline-offset: 3px; }
 
   /* --- BOOT OVERLAY + SYNC PILL ------------------------------------------- */
@@ -3207,7 +3208,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r29 · supabase';
+const OMNI_BUILD = 'r30 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -4745,12 +4746,27 @@ function omniShowFilmCard(title){
   document.body.appendChild(wrap);
 }
 
-// One capture-phase listener makes every film name in the app tappable —
-// capture so it wins over things like the All Screenings group toggle.
+// One capture-phase listener makes films tappable with a generous hit area:
+// the whole card around the title, not just the exact text. Buttons, links and
+// inputs inside the same card keep working (Lock, Show availability, Book…).
 document.addEventListener('click', function(e){
-  const el = e.target && e.target.closest ? e.target.closest('.film-name, .kids-name') : null;
-  if (!el) return;
-  const t = (el.textContent||'').trim();
+  if (!e.target || !e.target.closest) return;
+  if (e.target.closest('button, a, input, select, textarea, label')) return;   // real controls win
+
+  let host = null;
+  const gh = e.target.closest('.film-group-header');
+  if (gh){
+    // group headers keep their expand/collapse — only the title itself opens the card
+    if (!e.target.closest('.film-name')) return;
+    host = gh;
+  } else {
+    host = e.target.closest('.film-name, .kids-name, .film-title-row, .film-card, .future-film-card, .impossible-card, .kids-card');
+  }
+  if (!host) return;
+  const nameEl = (host.classList.contains('film-name') || host.classList.contains('kids-name'))
+    ? host : host.querySelector('.film-name, .kids-name');
+  if (!nameEl) return;
+  const t = (nameEl.textContent||'').trim();
   if (!t) return;
   e.stopPropagation(); e.preventDefault();
   omniShowFilmCard(t);
