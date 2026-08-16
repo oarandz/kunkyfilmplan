@@ -795,6 +795,10 @@
   #omni-review-jump .rj-x:hover { color: #0A0D16; }
   @media (max-width: 480px) { #omni-review-jump .rj-main { max-width: 180px; } }
 
+  /* --- FILM CARD AFFORDANCE ------------------------------------------------ */
+  .film-name, .kids-name { cursor: pointer; }
+  .film-name:hover, .kids-name:hover { text-decoration: underline; text-decoration-color: rgba(255,212,71,.5); text-underline-offset: 3px; }
+
   /* --- BOOT OVERLAY + SYNC PILL ------------------------------------------- */
   #omni-boot {
     position: fixed; inset: 0; z-index: 10050;
@@ -3203,7 +3207,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r28 · supabase';
+const OMNI_BUILD = 'r29 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3225,6 +3229,24 @@ function omniNtfyDate(d){
   return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()] + ' ' + dt.getDate() + ' ' +
     ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
 }
+// ---- film info cards (looked up once by Claude via supabase_sync.py) ------
+let OMNI_FILM_INFO = {};        // lower-cased title -> row
+async function sbGetFilmInfo(){
+  return sb('film_info?select=*');
+}
+function omniFilmInfo(title){
+  return OMNI_FILM_INFO[omniNormTitle(title).toLowerCase()] || null;
+}
+async function omniLoadFilmInfo(){
+  try {
+    const rows = await sbGetFilmInfo();
+    if (Array.isArray(rows)){
+      OMNI_FILM_INFO = {};
+      rows.forEach(r => { if (r && r.title) OMNI_FILM_INFO[omniNormTitle(r.title).toLowerCase()] = r; });
+    }
+  } catch(e){}   // cards just show the fallback until the table exists
+}
+
 // Diff the committed schedule around a rebuild and push the differences.
 // Quiet during boot: catching up on someone else's saved changes isn't news —
 // the device that MADE a change is the one that announces it.
@@ -3826,6 +3848,7 @@ async function omniLoadAll(){
   omniBootStep('fixtures', fxStep.status, fxStep.note);
   if (fxStep.status === 'stale') stale = true;
 
+  await omniLoadFilmInfo();
   omniBootStep('reviews','running');
   const addedFromReviews = await omniSyncReviewedWatched();
   omniBootStep('reviews', OMNI_REVIEW_REACHED ? 'ok' : 'fail',
@@ -4654,6 +4677,84 @@ function omniBootJump(){
   omniBootHide();
   omniPrefillReview(title, date);
 }
+
+// ============================================================================
+//  FILM CARD — tap any film name, anywhere, for its details.
+// ============================================================================
+function omniCloseFilmCard(){
+  const m = document.getElementById('omni-film-card'); if (m) m.remove();
+}
+function omniShowFilmCard(title){
+  omniCloseFilmCard();
+  title = omniNormTitle(title);
+  const info = omniFilmInfo(title);
+  // rating badge comes from the screenings data we already have
+  const src = (DATA.all_films||[]).find(f=>f.title===title) || (DATA.schedule||[]).find(f=>f.title===title);
+  const rating = (src && src.rating) || '';
+
+  const wrap = document.createElement('div');
+  wrap.id = 'omni-film-card';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(5,7,13,.72);z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;';
+  wrap.addEventListener('click', e => { if (e.target === wrap) omniCloseFilmCard(); });
+
+  const card = document.createElement('div');
+  card.style.cssText = 'width:100%;max-width:420px;max-height:82vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);';
+  const esc = omniEsc;
+
+  let inner = '<div style="padding:16px 18px 14px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">'
+    + '<div style="flex:1;">'
+    + `<div style="font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.3px;line-height:1.15;">${esc(title)}</div>`;
+  if (info){
+    const meta = [info.year, info.runtime_mins ? info.runtime_mins+' min' : '', info.director ? 'dir. '+info.director : '']
+      .filter(Boolean).join(' · ');
+    if (meta) inner += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px;">${esc(meta)}</div>`;
+  }
+  inner += '</div>'
+    + (rating ? `<span class="rating-badge rating-${esc(rating)}" style="flex:0 0 auto;">${esc(rating)}</span>` : '')
+    + '<button onclick="omniCloseFilmCard()" style="flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:19px;cursor:pointer;padding:0 0 0 6px;line-height:1;">×</button>'
+    + '</div>';
+
+  if (info){
+    const g = (info.genres||[]);
+    if (g.length){
+      inner += '<div style="padding:12px 18px 0;display:flex;gap:6px;flex-wrap:wrap;">'
+        + g.map(x=>`<span class="genre-chip">${esc(x)}</span>`).join('') + '</div>';
+    }
+    if (info.blurb)
+      inner += `<div style="padding:12px 18px 2px;font-size:13.5px;line-height:1.55;color:var(--text);">${esc(info.blurb)}</div>`;
+    const cast = (info.cast_list||[]);
+    if (cast.length)
+      inner += `<div style="padding:10px 18px 0;font-size:12px;color:var(--muted);">${esc(cast.join(', '))}</div>`;
+    // post-credits — the bit you actually argue about in the foyer
+    const pc = info.post_credits || {};
+    const hs = pc.has_scenes;
+    const label = hs === true ? 'YES' : hs === false ? 'NO' : '?';
+    const colr  = hs === true ? 'var(--new)' : hs === false ? 'var(--muted)' : 'var(--accent)';
+    inner += '<div style="margin:14px 18px 0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:baseline;gap:9px;">'
+      + '<span class=ntag style="margin:0;">STAY?</span>'
+      + `<span style="font-family:var(--mono);font-weight:600;font-size:13px;color:${colr};flex:0 0 auto;">${label}</span>`
+      + `<span style="font-size:12px;color:var(--muted);">${esc(pc.details || (hs === true ? 'Post-credits content' : hs === false ? 'Nothing after the credits' : 'Not confirmed yet'))}</span>`
+      + '</div>';
+    inner += `<div style="padding:12px 18px 16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);opacity:.65;">Looked up ${esc(info.looked_up_at||'')} · Claude</div>`;
+  } else {
+    inner += '<div style="padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.55;">No details for this one yet. New films are looked up automatically when the daily scrape sync runs — check back after the next one.</div>'
+      + '<div style="height:8px;"></div>';
+  }
+  card.innerHTML = inner;
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+}
+
+// One capture-phase listener makes every film name in the app tappable —
+// capture so it wins over things like the All Screenings group toggle.
+document.addEventListener('click', function(e){
+  const el = e.target && e.target.closest ? e.target.closest('.film-name, .kids-name') : null;
+  if (!el) return;
+  const t = (el.textContent||'').trim();
+  if (!t) return;
+  e.stopPropagation(); e.preventDefault();
+  omniShowFilmCard(t);
+}, true);
 
 window.addEventListener('beforeunload', function(e){
   const pill = document.getElementById('omni-conn');
