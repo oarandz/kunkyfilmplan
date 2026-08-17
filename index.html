@@ -3208,7 +3208,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r30 · supabase';
+const OMNI_BUILD = 'r32 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3451,8 +3451,20 @@ function omniOverlap(a, b){
 
 // Pick the best slot. HARD PREFERENCE: one film per day — a day that already has
 // a film is only used when the film has no free day available at all.
+// A showing is bookable-NOW if it starts in the future, or started within the
+// last 15 minutes (the adverts). Applies to NEW picks only — films already
+// committed stay on the schedule while they're showing, which the quick-review
+// flow relies on.
+const OMNI_START_GRACE_MINS = 15;
+function omniStartable(s){
+  const d = parseDateStr(s.date);
+  const [hh, mm] = String(s.start||'0:0').split(':').map(Number);
+  d.setHours(hh||0, mm||0, 0, 0);
+  return d.getTime() + OMNI_START_GRACE_MINS * 60000 > Date.now();
+}
+
 function omniPickBest(showings, taken){
-  const opts = showings.filter(s => omniSchedulable(s) && !taken.some(t => omniOverlap(t, s)));
+  const opts = showings.filter(s => omniSchedulable(s) && omniStartable(s) && !taken.some(t => omniOverlap(t, s)));
   if (!opts.length) return null;
   const perDay = {}; taken.forEach(t => { perDay[t.date] = (perDay[t.date]||0) + 1; });
   const rank = (a,b) =>
@@ -3578,7 +3590,7 @@ function omniBuildData(){
       const shared = dayCount[cur.date] > 1;
       const others = taken.filter(t => t !== cur);
       const opts = f.showings.filter(s =>
-        s !== cur && omniSchedulable(s) &&
+        s !== cur && omniSchedulable(s) && omniStartable(s) &&
         !dayCount[s.date] &&                        // target day must be empty
         !others.some(t => omniOverlap(t, s)) &&
         (shared || s.date < cur.date));             // spread, or strictly earlier
@@ -4682,6 +4694,11 @@ function omniBootJump(){
 // ============================================================================
 //  FILM CARD — tap any film name, anywhere, for its details.
 // ============================================================================
+function omniRevealPred(){
+  const b = document.getElementById('fc-pred-btn'), r = document.getElementById('fc-pred-row');
+  if (b) b.remove();
+  if (r) r.style.display = 'flex';
+}
 function omniCloseFilmCard(){
   const m = document.getElementById('omni-film-card'); if (m) m.remove();
 }
@@ -4736,6 +4753,26 @@ function omniShowFilmCard(title){
       + `<span style="font-family:var(--mono);font-weight:600;font-size:13px;color:${colr};flex:0 0 auto;">${label}</span>`
       + `<span style="font-size:12px;color:var(--muted);">${esc(pc.details || (hs === true ? 'Post-credits content' : hs === false ? 'Nothing after the credits' : 'Not confirmed yet'))}</span>`
       + '</div>';
+    // predicted scores, one per person, on their /5 scale — hidden behind a
+    // button so the numbers can't anchor anyone's real review by accident.
+    const pred = info.predicted || {};
+    const pp = ['Owen','Conor','Alice'].filter(n => typeof pred[n] === 'number');
+    if (pp.length){
+      inner += '<button id="fc-pred-btn" onclick="omniRevealPred()" '
+        + 'style="display:block;margin:10px 18px 0;width:calc(100% - 36px);padding:9px 12px;'
+        + 'background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);'
+        + 'color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:600;'
+        + 'letter-spacing:0.8px;text-transform:uppercase;cursor:pointer;text-align:center;">'
+        + 'Show predicted scores</button>';
+      inner += '<div id="fc-pred-row" style="display:none;margin:10px 18px 0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<span class=ntag style="margin:0;">PRED</span>'
+        + pp.map(n => `<span style="display:inline-flex;align-items:baseline;gap:5px;">`
+            + `<span class="attendee-chip ${chipClass(n)}">${n}</span>`
+            + `<span style="font-family:var(--mono);font-weight:600;font-size:13px;color:var(--text);">${pred[n].toFixed(1)}</span>`
+            + `</span>`).join('')
+        + '<span style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-left:auto;">/5 predicted</span>'
+        + '</div>';
+    }
     inner += `<div style="padding:12px 18px 16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);opacity:.65;">Looked up ${esc(info.looked_up_at||'')} · Claude</div>`;
   } else {
     inner += '<div style="padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.55;">No details for this one yet. New films are looked up automatically when the daily scrape sync runs — check back after the next one.</div>'
