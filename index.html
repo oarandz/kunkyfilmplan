@@ -1460,6 +1460,16 @@ function buildScreeningsPage() {
     html += typeBadge(film.title, film.is_rerelease, film.showings.some(s => s.is_maxx), film.is_estimated);
     html += ratingBadge(film.rating);
     html += `<span class="film-name">${film.title}</span>`;
+    // status at a glance: on the schedule (with its day, and a lock if pinned) or unwatchable
+    {
+      const sched = (typeof DATA !== 'undefined' && DATA.schedule || []).find(f => f.title === film.title);
+      const cant  = !sched && (watchableCount === 0 || (DATA.impossible || []).some(f => f.title === film.title));
+      if (sched) {
+        html += `<span class=ntag style="margin-left:8px;white-space:nowrap;">${sched.fixed_date ? '<svg class=ic style="margin-right:3px;vertical-align:-2px;"><use href=#ic-lock/></svg>' : ''}ON · ${formatDate(sched.showing.date).toUpperCase()}</span>`;
+      } else if (cant) {
+        html += `<span class=ntag style="margin-left:8px;white-space:nowrap;color:var(--danger);border-color:rgba(255,107,107,.3);background:rgba(255,107,107,.08);">CAN’T WATCH</span>`;
+      }
+    }
     if (lastDate !== '9999') {
       const urgency = lastDate <= TODAY ? 'var(--danger)' : lastDate <= addDays(TODAY, 7) ? 'var(--accent)' : 'var(--muted)';
       html += `<span style="font-size:11px;color:${urgency};margin-left:auto;padding-right:6px;">last: ${formatDate(lastDate)}</span>`;
@@ -3212,7 +3222,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r34 · supabase';
+const OMNI_BUILD = 'r35 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
