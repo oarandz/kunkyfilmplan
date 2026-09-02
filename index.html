@@ -766,6 +766,17 @@
 
 
   /* --- QUICK REVIEW JUMP --------------------------------------------------- */
+  #omni-record-jump {
+    position: fixed; left: 14px; bottom: 16px; z-index: 9600;
+    display: flex; border-radius: 999px; overflow: hidden;
+    box-shadow: 0 6px 24px -6px rgba(0,0,0,0.7), 0 0 0 1px rgba(70,227,165,0.4);
+  }
+  #omni-record-jump .rj-main { display:flex; align-items:center; gap:8px; max-width:220px; padding:10px 14px;
+    background: var(--new); color:#0A0D16; border:none; cursor:pointer; font-family:var(--body); text-align:left; }
+  #omni-record-jump .rj-main:disabled { opacity:.75; cursor:default; }
+  #omni-record-jump .rj-kicker { font-family:var(--mono); font-size:9px; font-weight:600; letter-spacing:1px;
+    border:1px solid rgba(10,13,22,0.4); border-radius:4px; padding:1px 5px 0; flex:0 0 auto; }
+  #omni-record-jump .rj-title { font-size:12.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #omni-review-jump {
     position: fixed; right: 14px; bottom: 16px; z-index: 9600;
     display: flex; align-items: stretch;
@@ -843,22 +854,24 @@
     background: rgba(255,107,107,0.08); font-size: 11.5px; color: var(--text); line-height: 1.5;
   }
   .boot-err code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); word-break: break-all; }
-  #boot-review { display: none; margin-top: 18px; }
-  #boot-review .br-btn {
+  #boot-review, #boot-record { display: none; margin-top: 18px; }
+  #boot-record .br-btn { background: var(--new); }
+  #boot-record .br-btn:disabled { opacity: .75; cursor: default; }
+  #boot-review .br-btn, #boot-record .br-btn {
     display: flex; align-items: center; gap: 9px; width: 100%;
     padding: 12px 14px; border: none; border-radius: var(--radius-sm);
     background: var(--accent); color: #0A0D16; cursor: pointer; text-align: left;
     font-family: var(--body);
   }
-  #boot-review .br-kicker {
+  #boot-review .br-kicker, #boot-record .br-kicker {
     font-family: var(--mono); font-size: 9px; font-weight: 600; letter-spacing: 1px;
     border: 1px solid rgba(10,13,22,0.4); border-radius: 4px; padding: 1px 5px 0; flex: 0 0 auto;
   }
-  #boot-review .br-title {
+  #boot-review .br-title, #boot-record .br-title {
     font-size: 13.5px; font-weight: 800;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  #boot-review .br-sub { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
+  #boot-review .br-sub, #boot-record .br-sub { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
 
   .boot-skip {
     display: none; margin-top: 14px; width: 100%; padding: 10px;
@@ -895,6 +908,7 @@
       <div class="boot-step" id="bs-fixtures"><i></i><span>Match days</span><em></em></div>
       <div class="boot-step" id="bs-reviews"><i></i><span>Reviews</span><em></em></div>
     </div>
+    <div id="boot-record"></div>
     <div id="boot-review"></div>
     <div class="boot-err" id="boot-err"></div>
     <button class="boot-skip" id="boot-skip" onclick="omniBootHide()">Continue offline</button>
@@ -1038,6 +1052,36 @@ function showPage(name) {
 // Built from Start_Times.txt — grows each visit
 const OBSERVED_OFFSETS = [15, 15, 15, 19, 15, 16, 15, 14, 10, 18, 18]; // MK2:+15, Obsession:+15, Passenger:+15, StarWars:+19, Backrooms:+15, PowerBallad:+16, Masters:+15, Tuner:+14, ScaryMovie:+10, DisclosureDay:+18, TheInvite:+18
 // Use mean of observed offsets. Falls back to 15 if no data.
+// Live start-time data (loaded from Supabase at boot) — see omniStartOffset().
+let OMNI_START_TIMES = [];
+let OMNI_START_MODEL = null;
+// Minutes after the advertised time the film itself is expected to start.
+// Precedence: Claude-derived model (by screen, then by hour, then default)
+// -> plain average of recorded starts -> the built-in constant.
+function omniStartOffset(s){
+  const m = OMNI_START_MODEL;
+  if (m && typeof m === 'object'){
+    const scr = s && s.screen ? String(s.screen) : '';
+    const hr  = s && s.start ? String(s.start).split(':')[0] : '';
+    if (scr && m.by_screen && typeof m.by_screen[scr] === 'number') return m.by_screen[scr];
+    if (hr  && m.by_hour   && typeof m.by_hour[hr]   === 'number') return m.by_hour[hr];
+    if (typeof m.default === 'number') return m.default;
+  }
+  if (OMNI_START_TIMES.length){
+    const v = OMNI_START_TIMES.map(r => Number(r.offset_mins)).filter(n => !isNaN(n));
+    if (v.length) return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
+  }
+  return PRE_SHOW_MINS;
+}
+function omniShowingMs(dateStr, timeStr){   // global twin of the calendar's showingMs()
+  const d = parseDateStr(dateStr); const [hh,mm] = String(timeStr||'0:0').split(':').map(Number);
+  d.setHours(hh||0, mm||0, 0, 0); return d.getTime();
+}
+function omniEstStart(s){                 // 'HH:MM' the film is expected to actually begin
+  const d = parseDateStr(s.date); const [hh,mm] = String(s.start||'0:0').split(':').map(Number);
+  d.setHours(hh||0, (mm||0) + omniStartOffset(s), 0, 0);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
 const PRE_SHOW_MINS = OBSERVED_OFFSETS.length > 0
   ? Math.round(OBSERVED_OFFSETS.reduce((a,b) => a+b, 0) / OBSERVED_OFFSETS.length)
   : 15;
@@ -1099,7 +1143,7 @@ function buildWeekPage() {
   function getFilmStatus(showing) {
     const now = Date.now();
     const slotStartMs = showingMs(showing.date, showing.start);
-    const filmStartMs = slotStartMs + PRE_SHOW_MINS * 60000;
+    const filmStartMs = slotStartMs + omniStartOffset(showing) * 60000;
     const filmEndMs = showingMs(showing.date, showing.end);
     if (now < filmStartMs) return { state: now < slotStartMs ? 'upcoming' : 'ads', targetMs: filmStartMs, label: 'film starts' };
     if (now >= filmStartMs && now < filmEndMs) return { state: 'showing', targetMs: filmEndMs, label: 'ends' };
@@ -1112,7 +1156,7 @@ function buildWeekPage() {
   const allShowings = DATA.schedule.map(s => ({
     title: s.title, showing: s.showing,
     slotStartMs: showingMs(s.showing.date, s.showing.start),
-    filmStartMs: showingMs(s.showing.date, s.showing.start) + PRE_SHOW_MINS * 60000,
+    filmStartMs: showingMs(s.showing.date, s.showing.start) + omniStartOffset(s.showing) * 60000,
     filmEndMs: showingMs(s.showing.date, s.showing.end),
   })).sort((a,b) => a.slotStartMs - b.slotStartMs);
 
@@ -1247,7 +1291,7 @@ function buildWeekPage() {
         html += `<div class="film-card">`;
         // Check if this is the active countdown film
         const cdId = 'cd_' + s.date + '_' + s.start.replace(':','');
-        const filmStartMs = showingMs(s.date, s.start) + PRE_SHOW_MINS * 60000;
+        const filmStartMs = showingMs(s.date, s.start) + omniStartOffset(s) * 60000;
         const filmEndMs = showingMs(s.date, s.end);
         const nowNow = Date.now();
         const isActive = activeCdId === cdId && (nowNow < filmEndMs);
@@ -1272,7 +1316,7 @@ function buildWeekPage() {
         html += `</div>`;
         html += `<div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">`;
         html += `<span style="font-family:'Archivo',sans-serif;font-size:24px;letter-spacing:1px;color:var(--accent);line-height:1">${s.start}</span>`;
-        html += `<span style="font-size:11px;color:var(--muted);">ends ${s.end}</span>`;
+        html += `<span style="font-size:11px;color:var(--muted);">film ~${omniEstStart(s)} · ends ${s.end}</span>`;
         if (s.screen) html += `<span style="font-size:11px;color:var(--muted);">${s.screen}</span>`;
         if (s.url) html += `<div style="margin-top:4px;">${availBtn(s.url)}</div>`;
         html += `</div></div>`;
@@ -3222,7 +3266,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r35 · supabase';
+const OMNI_BUILD = 'r36 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3251,6 +3295,16 @@ async function sbGetFilmInfo(){
 }
 function omniFilmInfo(title){
   return OMNI_FILM_INFO[omniNormTitle(title).toLowerCase()] || null;
+}
+async function omniLoadStartTimes(){
+  try {
+    const rows = await sb('start_times?select=*&order=date.asc');
+    if (Array.isArray(rows)) OMNI_START_TIMES = rows;
+  } catch(e){}
+  try {
+    const m = await sb('start_model?id=eq.1&select=model,based_on');
+    if (Array.isArray(m) && m[0] && m[0].model && Object.keys(m[0].model).length) OMNI_START_MODEL = m[0].model;
+  } catch(e){}
 }
 async function omniLoadFilmInfo(){
   try {
@@ -3881,6 +3935,8 @@ async function omniLoadAll(){
   if (fxStep.status === 'stale') stale = true;
 
   await omniLoadFilmInfo();
+  await omniLoadStartTimes();
+  try { omniBootRecordOffer(OMNI_STATE.committed); } catch(e){}   // Sheet's schedule, not the stale embed
   omniBootStep('reviews','running');
   const addedFromReviews = await omniSyncReviewedWatched();
   omniBootStep('reviews', OMNI_REVIEW_REACHED ? 'ok' : 'fail',
@@ -4651,14 +4707,21 @@ function omniLastSeenFilm(source){
     const dt = parseDateStr(s.date); dt.setHours(hh||0, mm||0, 0, 0);
     const ageH = (now - dt) / 3600000;
     if (ageH < 0 || ageH > 18) return;              // hasn't started, or too long ago
+    // still showing? don't offer the review mid-film (fall back to start + 2h30 if no end time)
+    let endMs = dt.getTime() + 150*60000;
+    if (s.end){ const [eh, em] = String(s.end).split(':').map(Number); const e = parseDateStr(s.date); e.setHours(eh||0, em||0, 0, 0); endMs = e.getTime(); if (endMs < dt.getTime()) endMs += 86400000; }
+    if (now < endMs) return;
     if (!best || dt > best.when) best = { title: f.title, date: s.date, when: dt, start: s.start };
   });
   return best;
 }
 
 function omniReviewShortcut(){
+  try { omniRecordShortcut(); } catch(e){}
   const host = document.getElementById('omni-review-jump');
-  const hit = omniLastSeenFilm();
+  const rec = (typeof omniRecordCandidate === 'function') ? omniRecordCandidate() : null;
+  let hit = omniLastSeenFilm();
+  if (hit && rec && rec.title === hit.title) hit = null;   // just sat down — recording, not reviewing
   if (!hit || OMNI_REVIEW_DISMISSED.has(hit.title)){ if (host) host.remove(); return; }
   let el = host;
   if (!el){
@@ -4695,6 +4758,70 @@ function omniPrefillReview(title, date){
 function omniJumpToReview(){
   const el = document.getElementById('omni-review-jump');
   omniPrefillReview(el ? el.dataset.title : '', el ? el.dataset.date : '');
+}
+
+// ---- record the ACTUAL start of the film we're sat in ----------------------
+// Window: from the advertised start until 30 minutes after it.
+function omniRecordCandidate(source){
+  const now = Date.now();
+  let best = null;
+  (source || DATA.schedule || []).forEach(f => {
+    const s = f.showing; if (!s || !s.date || !s.start) return;
+    const adv = omniShowingMs(s.date, s.start);
+    if (now < adv || now > adv + 30*60000) return;
+    if (OMNI_START_TIMES.some(r => r.film === f.title && r.date === s.date)) return;   // already recorded
+    if (!best || adv > best.adv) best = { title:f.title, date:s.date, start:s.start, screen:s.screen||'', adv };
+  });
+  return best;
+}
+function omniBootRecordOffer(source){
+  const host = document.getElementById('boot-record'); if (!host) return;
+  const hit = omniRecordCandidate(source);
+  if (!hit){ host.style.display='none'; host.innerHTML=''; return; }
+  host.innerHTML = `
+    <button class="br-btn" onclick="omniRecordStart(true)">
+      <span class="br-kicker">RECORD START</span>
+      <span class="br-title"></span>
+    </button>
+    <div class="br-sub">Tap the moment the film actually begins. Advertised <span class=brs-adv></span>.</div>`;
+  host.querySelector('.br-title').textContent = hit.title;
+  host.querySelector('.brs-adv').textContent = hit.start;
+  host.dataset.title = hit.title; host.dataset.date = hit.date; host.dataset.start = hit.start; host.dataset.screen = hit.screen;
+  host.style.display = 'block';
+}
+function omniRecordShortcut(){
+  const host = document.getElementById('omni-record-jump');
+  const hit = omniRecordCandidate();
+  if (!hit){ if (host) host.remove(); return; }
+  let el = host;
+  if (!el){ el = document.createElement('div'); el.id = 'omni-record-jump'; document.body.appendChild(el); }
+  el.innerHTML = `<button class="rj-main" onclick="omniRecordStart(false)"><span class="rj-kicker">RECORD START</span><span class="rj-title"></span></button>`;
+  el.querySelector('.rj-title').textContent = hit.title;
+  el.dataset.title = hit.title; el.dataset.date = hit.date; el.dataset.start = hit.start; el.dataset.screen = hit.screen;
+}
+async function omniRecordStart(fromBoot){
+  const host = document.getElementById(fromBoot ? 'boot-record' : 'omni-record-jump'); if (!host) return;
+  const { title, date, start, screen } = host.dataset;
+  const now = new Date();
+  const actual = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+  const offset = Math.round((now.getTime() - omniShowingMs(date, start)) / 60000);
+  const row = { film:title, date, screen: screen||'', advertised:start, actual, offset_mins:offset,
+                source:'app', recorded_at: now.toISOString() };
+  OMNI_START_TIMES.push(row);                       // local first so the button can't double-fire
+  const btn = host.querySelector('button');
+  if (btn){ btn.disabled = true; btn.querySelector('.br-kicker, .rj-kicker').textContent = 'RECORDED ' + actual; }
+  try {
+    if (!sbConfigured()) throw new Error('not configured');
+    if (typeof omniSaveBegin === 'function') omniSaveBegin();
+    await sb('start_times', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify([row]) });
+    if (typeof omniSaveEnd === 'function') omniSaveEnd();
+    omniToast(`Start recorded: ${actual} (+${offset} min)`,'var(--new)');
+  } catch(e){
+    if (typeof omniSaveEnd === 'function') omniSaveEnd();
+    omniToast('Start noted locally — couldn’t reach Supabase','var(--danger)');
+  }
+  if (!fromBoot) setTimeout(() => { const j=document.getElementById('omni-record-jump'); if (j) j.remove(); }, 1500);
+  else { const j=document.getElementById('omni-record-jump'); if (j) j.remove(); }
 }
 
 // Offer the review straight from the loading screen. Uses whatever schedule is
