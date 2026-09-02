@@ -1881,7 +1881,11 @@ function buildStatsPage() {
   html += statCard(S.total_this_year, 'Films in ' + yearNow, `so far this year`);
   html += `</div>`;
   html += `<div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;">`;
-  html += statCard(currentPct + '%', 'Currently Seen', `${S.current_seen} of ${S.current_total} showing`);
+  const wantedPct = S.wanted_total > 0 ? Math.round(S.wanted_seen / S.wanted_total * 100) : currentPct;
+  html += statCard(
+    `${currentPct}%<span style="font-size:15px;color:var(--muted);letter-spacing:0;margin-left:8px;">${wantedPct}%</span>`,
+    'Currently Seen',
+    `${S.current_seen} of ${S.current_total} showing · ${wantedPct}% excl. don’t-watch`);
   html += statCard(S.seen_share_pct + '%', 'Screen Share', 'of all current screenings');
   html += `</div>`;
   html += `<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">`;
@@ -3208,7 +3212,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r33 · supabase';
+const OMNI_BUILD = 'r34 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3731,6 +3735,9 @@ function omniLiveStats(){
       : (typeof STATS!=='undefined' && STATS.cumulative ? STATS.cumulative.map(c=>c.title) : []))
     .map(t => omniNormTitle(t).toLowerCase()));
   const seenNow = pool.filter(f => watched.has(f.title.toLowerCase()));
+  const dnw = new Set(OMNI_STATE.doNotWatch.map(t => omniNormTitle(t).toLowerCase()));
+  const poolWanted = pool.filter(f => !dnw.has(f.title.toLowerCase()));
+  const seenWanted = poolWanted.filter(f => watched.has(f.title.toLowerCase()));
   const screenTotal = pool.reduce((n,f)=>n+f.count, 0);
   const screenSeen  = seenNow.reduce((n,f)=>n+f.count, 0);
 
@@ -3753,6 +3760,8 @@ function omniLiveStats(){
     longest_gap: gap,
     current_total: pool.length,
     current_seen: seenNow.length,
+    wanted_total: poolWanted.length,
+    wanted_seen: seenWanted.length,
     seen_share_pct: screenTotal ? Math.round(screenSeen / screenTotal * 100) : 0,
     month_data: Object.keys(byMonth).sort().map(m => ({ month:m, count:byMonth[m].length })),
     films_per_week: Object.keys(byWeek).sort().slice(-26).map(w => ({ week:w, count:byWeek[w].length })),
@@ -4796,15 +4805,50 @@ function omniShowFilmCard(title){
     const label = lock
       ? `<svg class=ic><use href=#ic-lock/></svg>Locked · ${esc(formatFullDate(lock.date))} ${esc(lock.start)} — change`
       : `<svg class=ic><use href=#ic-unlock/></svg>Lock in a showing`;
-    inner += `<div style="padding:0 18px 16px;"><button onclick="omniCardLock()" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);`
+    inner += `<div style="padding:0 18px 10px;"><button onclick="omniCardLock()" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);`
       + (lock ? 'background:rgba(255,212,71,.12);color:var(--accent);border:1px solid rgba(255,212,71,.35);'
               : 'background:var(--accent);color:var(--bg);border:none;')
       + `font-weight:800;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">${label}</button></div>`;
+  }
+  // secondary actions: jump to its screenings; toggle the don't-watch list
+  {
+    const skipped = OMNI_STATE.doNotWatch.some(t => omniNormTitle(t).toLowerCase() === title.toLowerCase());
+    const sec = 'flex:1;padding:9px 10px;border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);border:1px solid var(--border);font-weight:700;font-size:11.5px;cursor:pointer;';
+    inner += '<div style="display:flex;gap:8px;padding:0 18px 16px;">'
+      + `<button onclick="omniCardScreenings()" style="${sec}">All screenings</button>`
+      + `<button onclick="omniCardSkipToggle()" style="${sec}${skipped ? 'color:var(--accent);border-color:rgba(255,212,71,.35);' : ''}">`
+      + (skipped ? 'Un-skip this film' : "Don't want to watch") + '</button>'
+      + '</div>';
   }
   card.innerHTML = inner;
   card.dataset.title = title;
   wrap.appendChild(card);
   document.body.appendChild(wrap);
+}
+function omniCardScreenings(){
+  const c = document.querySelector('#omni-film-card [data-title]');
+  const title = c ? c.dataset.title : '';
+  omniCloseFilmCard();
+  showPage('screenings');
+  const id = 'fg_' + title.replace(/[^a-z0-9]/gi, '');
+  setTimeout(() => {
+    const el = document.getElementById(id);
+    if (!el){ omniToast('No upcoming screenings listed for this film','var(--accent)'); return; }
+    el.classList.add('open');
+    el.scrollIntoView({ behavior:'smooth', block:'start' });
+    el.style.boxShadow = '0 0 0 2px var(--accent)';
+    setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+  }, 60);
+}
+function omniCardSkipToggle(){
+  const c = document.querySelector('#omni-film-card [data-title]');
+  const title = c ? c.dataset.title : '';
+  if (!title) return;
+  const i = OMNI_STATE.doNotWatch.findIndex(t => omniNormTitle(t).toLowerCase() === title.toLowerCase());
+  if (i >= 0){ OMNI_STATE.doNotWatch.splice(i, 1); omniToast(`“${title}” back in the running`,'var(--new)'); }
+  else { OMNI_STATE.doNotWatch.push(title); omniToast(`“${title}” skipped — see the Excluded tab`,'var(--accent)'); }
+  omniCloseFilmCard();
+  omniApply(true);
 }
 function omniCardLock(){
   const c = document.querySelector('#omni-film-card [data-title]');
