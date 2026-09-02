@@ -3208,7 +3208,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r32 · supabase';
+const OMNI_BUILD = 'r33 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -4509,9 +4509,21 @@ function omniUploadScrape(){
 // ============================================================================
 //  LOCK / MOVE
 // ============================================================================
+function omniLockableFilm(title){
+  let film = (DATA.all_films||[]).find(f=>f.title===title) || (DATA.schedule||[]).find(f=>f.title===title);
+  if (film) return film;
+  // not a current candidate (e.g. on the Kids / Excluded lists) — build it from the log
+  try {
+    const today = omniToday();
+    const raw = omniNormaliseRaw(OMNI_SCRAPE || DATA.film_cache || []).find(f=>f.title===title);
+    if (!raw) return null;
+    const showings = raw.showings.filter(s=>s.date>=today).map(omniAnnotate);
+    return showings.length ? Object.assign({}, raw, { showings }) : null;
+  } catch(e){ return null; }
+}
 function omniOpenLock(title){
-  const film=DATA.all_films.find(f=>f.title===title)||DATA.schedule.find(f=>f.title===title);
-  if(!film){ omniToast('Film options not loaded — upload a scrape first','var(--accent)'); return; }
+  const film=omniLockableFilm(title);
+  if(!film){ omniToast('No upcoming showings for this film','var(--accent)'); return; }
   const lock=OMNI_STATE.locks.find(l=>l.title===title);
   const rows=(film.showings||[]).map(s=>{ const picked=lock&&lock.date===s.date&&lock.start===s.start;
     const who=s.attendees&&s.attendees.length?s.attendees.join(', '):(s.blocked?(s.reasons.map(reasonLabel).join('; ')||'blocked'):'—');
@@ -4778,9 +4790,27 @@ function omniShowFilmCard(title){
     inner += '<div style="padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.55;">No details for this one yet. New films are looked up automatically when the daily scrape sync runs — check back after the next one.</div>'
       + '<div style="height:8px;"></div>';
   }
+  // lock in a showing straight from the card — works for scheduled AND unscheduled films
+  if (omniLockableFilm(title)){
+    const lock = OMNI_STATE.locks.find(l=>l.title===title);
+    const label = lock
+      ? `<svg class=ic><use href=#ic-lock/></svg>Locked · ${esc(formatFullDate(lock.date))} ${esc(lock.start)} — change`
+      : `<svg class=ic><use href=#ic-unlock/></svg>Lock in a showing`;
+    inner += `<div style="padding:0 18px 16px;"><button onclick="omniCardLock()" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);`
+      + (lock ? 'background:rgba(255,212,71,.12);color:var(--accent);border:1px solid rgba(255,212,71,.35);'
+              : 'background:var(--accent);color:var(--bg);border:none;')
+      + `font-weight:800;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">${label}</button></div>`;
+  }
   card.innerHTML = inner;
+  card.dataset.title = title;
   wrap.appendChild(card);
   document.body.appendChild(wrap);
+}
+function omniCardLock(){
+  const c = document.querySelector('#omni-film-card [data-title]');
+  const title = c ? c.dataset.title : '';
+  omniCloseFilmCard();
+  if (title) omniOpenLock(title);
 }
 
 // One capture-phase listener makes films tappable with a generous hit area:
