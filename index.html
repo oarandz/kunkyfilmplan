@@ -1354,13 +1354,15 @@ function buildWeekPage() {
           const nextStartMins = timeToMins(sorted[i+1].showing.start);
           const gap = nextStartMins - endMins;
           if (gap >= 0) {
-            const hrs = Math.floor(gap / 60);
-            const mins = gap % 60;
-            const gapStr = hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+            const fmt = g => { const hh = Math.floor(g / 60), mm = g % 60; return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`; };
             const gapColour = gap < 30 ? 'var(--danger)' : gap < 90 ? 'var(--accent)' : 'var(--muted)';
+            // the next film really starts after its adverts — the gap you actually get
+            const estNext = timeToMins(omniEstStart(sorted[i+1].showing));
+            const actual = estNext - endMins;
             html += `<div class="gap-indicator">`;
             html += `<div class="gap-line"></div>`;
-            html += `<span style="font-size:11px;font-weight:600;color:${gapColour};white-space:nowrap">⏱ ${gapStr} gap</span>`;
+            html += `<span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${gapColour};white-space:nowrap">${fmt(gap)} gap</span>`;
+            if (actual !== gap) html += `<span style="font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;margin-left:6px">· ~${fmt(Math.max(0, actual))} actual</span>`;
             html += `<div class="gap-line"></div>`;
             html += `</div>`;
           }
@@ -3266,7 +3268,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r36 · supabase';
+const OMNI_BUILD = 'r37 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
