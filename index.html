@@ -2003,7 +2003,7 @@ function buildStatsPage() {
   html += `<div class="section-title">PREDICTIONS<span class="section-count">how close Claude gets</span></div>`;
   html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
     <div style="font-size:12px;font-weight:700;margin-bottom:2px;">Score predictions \u2014 our score minus predicted (/5)</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Above the line = we liked it more than predicted. ${RA&&RA.n?RA.n+' film'+(RA.n>1?'s':'')+' with both a prediction and a review.':'Nothing to compare yet \u2014 needs films that have both a prediction and a review.'}</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Above the line = we liked it more than predicted. ${RA&&RA.n?RA.n+' film'+(RA.n>1?'s':'')+' whose prediction was made before you reviewed it.':'Nothing to compare yet \u2014 a film counts once it has been looked up and then reviewed afterwards.'}</div>`;
   if (RA && RA.n){
     html += `<canvas id="pred-chart" style="width:100%;height:170px;display:block;"></canvas>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;">` +
@@ -2013,7 +2013,7 @@ function buildStatsPage() {
   html += `</div>`;
   html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
     <div style="font-size:12px;font-weight:700;margin-bottom:2px;">Film-start predictions \u2014 minutes after the advertised time</div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${SA&&SA.n?`Yellow = when the film actually started, grey = what we predicted. ${SA.n} recorded start${SA.n>1?'s':''}.`:'No recorded starts yet \u2014 use the Record start button when a film begins.'}</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${SA&&SA.n?`Yellow = when the film actually started, grey = what we predicted. ${SA.n} recorded start${SA.n>1?'s':''} with the prediction stored at the time.`:'Nothing to compare yet \u2014 counts starts recorded with the Record start button once the predicted_mins column exists.'}</div>`;
   if (SA && SA.n){
     html += `<canvas id="start-chart" style="width:100%;height:170px;display:block;"></canvas>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;">
@@ -3358,7 +3358,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r41 · supabase';
+const OMNI_BUILD = 'r43 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3977,6 +3977,9 @@ function omniLiveStats(){
 }
 
 // Prediction accuracy: our real scores vs Claude's predicted scores, per person.
+// A point only counts when the prediction genuinely came first — the film was
+// looked up on or before the day it was reviewed. Predictions made after the
+// fact aren't a test of anything.
 function omniRatingAccuracy(){
   const rows = (typeof _reviewCache !== 'undefined' && Array.isArray(_reviewCache)) ? _reviewCache : [];
   const pts = [];
@@ -3986,6 +3989,7 @@ function omniRatingAccuracy(){
     const actual = parseFloat(r.raw);
     if (typeof pred !== 'number' || isNaN(actual)) return;
     const d = omniIsoDate(r.date) || omniIsoDate(r.timestamp); if (!d) return;
+    const looked = omniIsoDate(info.looked_up_at); if (!looked || looked > d) return;   // prediction must pre-date the review
     pts.push({ date:d, film:omniNormTitle(r.film), person:r.person, actual, pred, err:+(actual-pred).toFixed(2) });
   });
   pts.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:a.film.localeCompare(b.film));
@@ -3999,17 +4003,13 @@ function omniRatingAccuracy(){
 }
 
 // Start-time accuracy: what we predicted vs when the film really began.
-// Uses the prediction stored at recording time when present; older rows are
-// scored against the current model applied retrospectively (flagged as such).
+// Only recordings that stored their prediction at the time count — anything
+// else would be today's rules marking their own homework.
 function omniStartAccuracy(){
-  const rows = (OMNI_START_TIMES||[]).filter(r => r && r.date && !isNaN(Number(r.offset_mins)))
+  const rows = (OMNI_START_TIMES||[]).filter(r => r && r.date && !isNaN(Number(r.offset_mins)) && !isNaN(Number(r.predicted_mins)) && r.predicted_mins !== null)
     .slice().sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:String(a.advertised).localeCompare(String(b.advertised)));
-  let retro = 0;
-  const pts = rows.map(r => {
-    let pred = Number(r.predicted_mins);
-    if (isNaN(pred)){ pred = omniStartOffset({ start:r.advertised, screen:r.screen||'' }); retro++; }
-    return { date:r.date, film:r.film, actual:Number(r.offset_mins), pred, err:Number(r.offset_mins)-pred };
-  });
+  const retro = 0;
+  const pts = rows.map(r => ({ date:r.date, film:r.film, actual:Number(r.offset_mins), pred:Number(r.predicted_mins), err:Number(r.offset_mins)-Number(r.predicted_mins) }));
   const errs = pts.map(p=>p.err);
   return { labels: pts.map(p=>p.date), pts,
     series: [ { name:'Actual', color:'#FFD447', values: pts.map(p=>p.actual) },
