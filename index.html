@@ -1297,7 +1297,18 @@ function buildWeekPage() {
     html += `<span class="day-date">${d.getDate()} ${monthNames[d.getMonth()]}</span>`;
     html += `</div></div>`;
 
-    if (!hasFilm) {
+    // films we went to today — reviewed, so off the schedule, but still shown greyed
+    const seenToday = (typeof OMNI_STATE !== 'undefined' ? (OMNI_STATE.seen||[]) : [])
+      .filter(x => x.date === dateStr && !films.some(f => f.title === x.title));
+    if (seenToday.length) {
+      seenToday.forEach(x => {
+        html += `<div class="film-card" style="opacity:.5;filter:grayscale(.6);">`;
+        html += `<div class="film-title-row"><span class=ntag>SEEN</span><div class="film-name">${x.title}</div></div>`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;"><span style="font-size:11px;color:var(--muted);">reviewed \u2014 tap for the summary</span>` +
+          (x.start ? `<span class="film-time" style="font-size:14px;">${x.start}</span>` : '') + `</div></div>`;
+      });
+    }
+    if (!hasFilm && !seenToday.length) {
       if (notes.length > 0) {
         notes.forEach(note => {
           html += `<div style="padding:5px 14px;font-size:12px;color:var(--muted);background:var(--surface2);border-top:1px solid var(--border)">${note}</div>`;
@@ -2981,7 +2992,7 @@ function renderReviewTable(data) {
     html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">`;
     html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">`;
     html += `<span style="font-family:'Archivo',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
-    html += `<span style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
+    html += `<span class="film-name" style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
     html += `<span style="font-family:'Archivo',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${scoreVal.toFixed(2)}</span>`;
     html += `</div>`;
     // Per-person scores with visual line
@@ -3358,7 +3369,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r43 · supabase';
+const OMNI_BUILD = 'r44 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3503,6 +3514,7 @@ let OMNI_STATE = {
   kidsRemoved: [],
   sportRemoved: [],
   rules: [],          // recurring availability rules (see omniRuleBlocks)
+  seen: [],           // {title,date,start,end,screen} — what we actually went to (feeds today's greyed cards)
 };
 let OMNI_SCRAPE = null;   // in-memory raw scrape (array), loaded from Sheet or upload
 
@@ -4079,6 +4091,7 @@ async function omniLoadAll(){
   OMNI_STATE.kidsRemoved = (DATA.kids_removed||[]).slice();
   OMNI_STATE.sportRemoved= (DATA.sport_removed||[]).slice();
   OMNI_STATE.rules = JSON.parse(JSON.stringify(OMNI_DEFAULT_RULES));
+  OMNI_STATE.seen = [];
   OMNI_STATE.committed   = (DATA.schedule||[]).map(omniSerialiseCommitted); // seed from embedded snapshot
 
   if (!sbConfigured()){
@@ -4100,6 +4113,7 @@ async function omniLoadAll(){
       if (Array.isArray(s.kidsRemoved)) OMNI_STATE.kidsRemoved = s.kidsRemoved;
       if (Array.isArray(s.sportRemoved)) OMNI_STATE.sportRemoved = s.sportRemoved;
       OMNI_STATE.rules = Array.isArray(s.rules) ? s.rules : JSON.parse(JSON.stringify(OMNI_DEFAULT_RULES));   // first run after upgrade: seed the old built-ins as editable rules
+      OMNI_STATE.seen = Array.isArray(s.seen) ? s.seen : [];
     } else { ok = true; stateNote = 'empty — first run'; }
   } catch(e){ stateNote = e.message; if (e.status === 404) missingTables = true; }
   omniBootStep('state', ok ? 'ok' : 'fail', stateNote);
@@ -4171,7 +4185,16 @@ let OMNI_REVIEW_ADDED = [];
 
 // Called straight after a review is saved, so the film drops out immediately.
 let OMNI_REVIEW_QUEUE = [];
+function omniRememberSeen(title){
+  const t = omniNormTitle(title);
+  const f = (DATA.schedule||[]).find(x => x.title === t);
+  const date = f ? f.showing.date : omniToday();
+  OMNI_STATE.seen = OMNI_STATE.seen || [];
+  if (OMNI_STATE.seen.some(x => x.title === t && x.date === date)) return;
+  OMNI_STATE.seen.push({ title:t, date, start: f ? f.showing.start : '', end: f ? f.showing.end : '', screen: f ? (f.showing.screen||'') : '' });
+}
 function omniReviewSaved(title){
+  try { omniRememberSeen(title); } catch(e){}
   OMNI_REVIEW_DISMISSED.add(omniNormTitle(title));
   const j = document.getElementById('omni-review-jump');
   if (j && j.dataset.title === omniNormTitle(title)) j.remove();
@@ -4291,7 +4314,7 @@ function omniSaveState(){
   omniSaveBegin();
   sbSaveState({ diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
       committed:OMNI_STATE.committed, watched:OMNI_STATE.watched, doNotWatch:OMNI_STATE.doNotWatch,
-      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved, rules:OMNI_STATE.rules })
+      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved, rules:OMNI_STATE.rules, seen:OMNI_STATE.seen })
     .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd();
       sbWriteScheduleMirror(OMNI_STATE.committed).catch(()=>{}); })
     .catch(e=>{ omniToast('Save FAILED: '+e.message,'var(--danger)'); omniSetStatus('unsaved'); omniSaveEnd(); });
@@ -4375,7 +4398,8 @@ function omniFingerprint(o){
   const dy = (o.diary||[]).map(d => d.person+'|'+d.date+'|'+(d.reason||'')+'|'+(d.from||'')+'-'+(d.to||'')).sort().join(';');
   const lk = (o.locks||[]).map(l => l.title+'@'+l.date+'T'+l.start).sort().join(';');
   const ru = (o.rules||[]).map(r => JSON.stringify([r.id, (r.people||[]).slice().sort(), (r.days||[]).slice().sort(), !!r.allDay, r.from||'', r.to||'', r.reason||'', (r.paused||[]).map(p=>p.from+'>'+p.to).sort(), r.enabled!==false])).sort().join(';');
-  return [cm, dy, lk, list(o.watched), list(o.doNotWatch), list(o.kidsRemoved), list(o.sportRemoved), ru].join('||');
+  const sn = (o.seen||[]).map(x => x.title+'@'+x.date+'T'+(x.start||'')).sort().join(';');
+  return [cm, dy, lk, list(o.watched), list(o.doNotWatch), list(o.kidsRemoved), list(o.sportRemoved), ru, sn].join('||');
 }
 function omniSaveBegin(){ OMNI_SAVING++; omniSetStatus('saving'); }
 function omniSaveEnd(){
@@ -5421,6 +5445,23 @@ function omniShowFilmCard(title){
     inner += '<div style="padding:16px 18px;font-size:13px;color:var(--muted);line-height:1.55;">No details for this one yet. New films are looked up automatically when the daily scrape sync runs — check back after the next one.</div>'
       + '<div style="height:8px;"></div>';
   }
+  // post-film summary — once there are reviews
+  {
+    const nReviews = ((typeof _reviewCache!=='undefined' && Array.isArray(_reviewCache)) ? _reviewCache : [])
+      .filter(r => r && omniNormTitle(r.film).toLowerCase() === title.toLowerCase()).length;
+    const seen = (OMNI_STATE.seen||[]).some(x => x.title === title);
+    if (nReviews || seen){
+      inner += `<div id="fc-summary" style="margin:12px 18px 0;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:${info&&info.summary?'8px':'0'};">
+          <span class=ntag style="margin:0;">SUMMARY</span>
+          <span style="font-size:11px;color:var(--muted);flex:1;">${nReviews} review${nReviews===1?'':'s'} in</span>
+          <button onclick="omniGenerateSummary()" style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:${info&&info.summary?'var(--surface)':'var(--accent)'};color:${info&&info.summary?'var(--text)':'var(--bg)'};font-weight:800;font-size:11px;cursor:pointer;">${info&&info.summary?'Regenerate':'Generate summary'}</button>
+        </div>
+        ${info&&info.summary ? `<div id="fc-summary-text" style="font-size:12.5px;line-height:1.55;white-space:pre-wrap;">${esc(info.summary)}</div><div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);opacity:.65;margin-top:8px;">Written ${esc(info.summary_at||'')}</div>` : ''}
+      </div>`;
+    }
+  }
+
   // lock in a showing straight from the card — works for scheduled AND unscheduled films
   if (omniLockableFilm(title)){
     const lock = OMNI_STATE.locks.find(l=>l.title===title);
@@ -5471,6 +5512,34 @@ function omniCardSkipToggle(){
   else { OMNI_STATE.doNotWatch.push(title); omniToast(`“${title}” skipped — see the Excluded tab`,'var(--accent)'); }
   omniCloseFilmCard();
   omniApply(true);
+}
+// Ask the Supabase Edge Function to write the post-film summary (it holds the
+// Anthropic key; the app never does). Warned first — it's a paid call.
+async function omniGenerateSummary(){
+  const c = document.querySelector('#omni-film-card [data-title]');
+  const title = c ? c.dataset.title : ''; if (!title) return;
+  const ok = confirm(`Generate the summary for \u201c${title}\u201d?\n\nOnly press this if you\u2019re the LAST of us to review it \u2014 it sends one API request and the write-up uses whatever reviews are in right now.`);
+  if (!ok) return;
+  const box = document.getElementById('fc-summary'); const btn = box && box.querySelector('button');
+  if (btn){ btn.disabled = true; btn.textContent = 'Writing\u2026'; }
+  try {
+    const r = await fetch(SUPABASE_URL.replace(/\/$/,'') + '/functions/v1/film-summary', {
+      method:'POST', headers:{ 'apikey': SUPABASE_ANON_KEY, 'Content-Type':'application/json' },
+      body: JSON.stringify({ film: title }) });
+    const text = await r.text(); let data = {};
+    try { data = JSON.parse(text); } catch(e){ data = { error: text.slice(0,200) }; }
+    if (!r.ok || !data.summary){
+      const why = r.status === 404 ? 'the film-summary function isn\u2019t deployed yet (see the setup notes)' : (data.error || ('HTTP ' + r.status));
+      throw new Error(why);
+    }
+    const key = omniNormTitle(title).toLowerCase();
+    OMNI_FILM_INFO[key] = Object.assign(OMNI_FILM_INFO[key] || { title }, { summary: data.summary, summary_at: data.summary_at || omniToday() });
+    omniShowFilmCard(title);
+    omniToast('Summary written','var(--new)');
+  } catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = 'Generate summary'; }
+    omniToast('Summary failed \u2014 ' + (e && e.message ? e.message : e), 'var(--danger)');
+  }
 }
 function omniCardLock(){
   const c = document.querySelector('#omni-film-card [data-title]');
