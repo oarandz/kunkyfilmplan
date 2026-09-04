@@ -806,6 +806,9 @@
   #omni-review-jump .rj-x:hover { color: #0A0D16; }
   @media (max-width: 480px) { #omni-review-jump .rj-main { max-width: 180px; } }
 
+  .cell-ic { width: 14px; height: 14px; display: block; margin: 0 auto; }
+  .line-ic { width: 12px; height: 12px; vertical-align: -2px; margin-right: 4px; }
+
   /* --- FILM CARD AFFORDANCE ------------------------------------------------ */
   .film-name, .kids-name, .film-title-row, .film-card, .future-film-card,
   .impossible-card, .kids-card { cursor: pointer; }
@@ -921,6 +924,19 @@
     <rect x="2.4" y="4.6" width="19.2" height="14.8" rx="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/>
     <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/>
     <path d="M6.1 8.3v7.4M17.9 8.3v7.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ic-quiz" viewBox="0 0 24 24">
+    <path d="M8.2 9.2a3.8 3.8 0 1 1 5.6 3.3c-1.2.7-1.8 1.4-1.8 2.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="12" cy="18.6" r="1.4" fill="currentColor"/>
+  </symbol>
+  <symbol id="ic-rl" viewBox="0 0 24 24">
+    <ellipse cx="12" cy="12" rx="9.2" ry="5.6" transform="rotate(-35 12 12)" fill="none" stroke="currentColor" stroke-width="1.9"/>
+    <path d="M7.8 15.2l8.4-6.4M10.2 13.9l1-1.7M12.2 12.4l1-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="ic-fc" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.9"/>
+    <path d="M12 6.6l3.6 2.6-1.4 4.2H9.8L8.4 9.2z" fill="currentColor"/>
+    <path d="M12 6.6V3.4M15.6 9.2l3.1-1M14.2 13.4l2 2.6M9.8 13.4l-2 2.6M8.4 9.2l-3.1-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
   </symbol>
   <symbol id="ic-lock" viewBox="0 0 24 24">
     <rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.9"/>
@@ -3273,7 +3289,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r39 · supabase';
+const OMNI_BUILD = 'r40 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3495,7 +3511,7 @@ function omniMergeScrape(rawNew){
 // A timed block only bites if it overlaps the showing (start–end).
 const OMNI_DEFAULT_RULES = [
   { id:'work', people:['Owen'], days:[1,2,3,4,5], allDay:false, from:'00:00', to:'19:35', reason:'Work', paused:[], enabled:true },
-  { id:'quiz', people:['Owen','Conor'], days:[4], allDay:true, from:'', to:'', reason:'Pub quiz', paused:[], enabled:true },
+  { id:'quiz', people:['Owen','Conor'], days:[4], allDay:true, from:'', to:'', reason:'Pub quiz', icon:'quiz', paused:[], enabled:true },
 ];
 function omniOverlaps(aFrom, aTo, bFrom, bTo){ return aFrom < bTo && aTo > bFrom; }
 function omniDefaultEnd(startStr){
@@ -3534,6 +3550,16 @@ function omniBusy(person, dateStr, startStr, endStr){
 function omniPersonFree(person, dateStr, startStr, dayName, endStr){
   return !omniBusy(person, dateStr, startStr, endStr);
 }
+function omniRuleIcon(r){ return r.icon || (/quiz/i.test(r.reason||'') ? 'quiz' : ''); }
+function omniIconSvg(name, cls){ return name ? `<svg class="${cls||'cell-ic'}"><use href="#ic-${name}"/></svg>` : ''; }
+// the symbol for a person's structural blocks on a day: match day beats rule icons
+function omniCellIcon(person, ds){
+  const mf = omniMatchDay(ds, person);
+  if (mf) return mf.sport === 'rl' ? 'rl' : 'fc';
+  for (const b of omniRuleBlocks(person, ds)){ const ic = omniRuleIcon(b.rule); if (ic) return ic; }
+  return '';
+}
+function omniPausedForDay(rule, ds){ return (rule.paused||[]).findIndex(p => p.from===ds && p.to===ds); }
 function omniRuleText(r){
   const dn = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   const days = (r.days||[]).slice().sort((a,b)=>((a+6)%7)-((b+6)%7)).map(d=>dn[d]).join(' ');
@@ -4404,6 +4430,51 @@ function omniDiaryToggle(person, ds){
 }
 function omniDiaryToggleDay(ds){ omniDiaryToggle(OMNI_DIARY_VIEW.person, ds); }   // kept for older callers
 
+// Tap on a cell: manual entry -> toggle it; rule/match block -> offer to skip the rule for that day.
+function omniCellTap(person, ds){
+  const P = OMNI_DIARY_PENDING || OMNI_STATE.diary;
+  const manual = omniDiaryEntry(P, person, ds) || omniDiaryAllEntry(P, ds);
+  const blocks = omniRuleBlocks(person, ds), mf = omniMatchDay(ds, person);
+  if (manual || (!blocks.length && !mf)) { omniDiaryToggle(person, ds); return; }
+  omniRuleChooser(person, ds, blocks, mf);
+}
+function omniRuleChooser(person, ds, blocks, mf){
+  const old = document.getElementById('omni-rule-chooser'); if (old) old.remove();
+  const esc = omniEsc;
+  const wrap = document.createElement('div'); wrap.id = 'omni-rule-chooser';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(5,7,13,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;';
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  const btn = 'display:flex;align-items:center;gap:8px;width:100%;padding:11px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:12.5px;cursor:pointer;text-align:left;margin-top:8px;';
+  let inner = `<div style="width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-2);">
+    <div style="font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:.3px;margin-bottom:4px;">${esc(person)} \u00b7 ${esc(formatFullDate(ds))}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Marked busy by:</div>`;
+  blocks.forEach(b => {
+    const idx = OMNI_STATE.rules.indexOf(b.rule);
+    inner += `<button onclick="omniRuleSkipDay(${idx},'${ds}')" style="${btn}">${omniIconSvg(omniRuleIcon(b.rule),'line-ic')}<span style="flex:1;">Skip <b>${esc(b.reason)}</b> for this day</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted);">${b.allDay?'all day':esc(b.from+'\u2013'+b.to)}</span></button>`;
+  });
+  if (mf) inner += `<div style="${btn}cursor:default;color:var(--muted);">${omniIconSvg(mf.sport==='rl'?'rl':'fc','line-ic')}<span style="flex:1;font-weight:600;">${esc(omniMatchDayText(mf))}</span><span style="font-family:var(--mono);font-size:10px;">fixture</span></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Match days come from the fixtures upload \u2014 remove the row in the <b>fixtures</b> table to override.</div>`;
+  inner += `<button onclick="document.getElementById('omni-rule-chooser').remove();omniDiaryToggle('${esc(person)}','${ds}')" style="${btn}"><span style="flex:1;">Mark busy for another reason too</span></button>
+    <button onclick="document.getElementById('omni-rule-chooser').remove()" style="${btn}background:none;border-color:transparent;color:var(--muted);justify-content:center;">Cancel</button></div>`;
+  wrap.innerHTML = inner; document.body.appendChild(wrap);
+}
+function omniRuleSkipDay(i, ds){
+  const r = OMNI_STATE.rules[i]; if (!r) return;
+  const c = document.getElementById('omni-rule-chooser'); if (c) c.remove();
+  r.paused = r.paused || []; r.paused.push({ from:ds, to:ds });
+  const sheet = document.getElementById('omni-day-sheet');
+  omniRulesCommit(`${r.reason} skipped for ${formatDate(ds)}`);
+  if (sheet) omniDayOpen(ds);
+}
+function omniRuleRestoreDay(i, ds){
+  const r = OMNI_STATE.rules[i]; if (!r) return;
+  const j = omniPausedForDay(r, ds); if (j < 0) return;
+  r.paused.splice(j, 1);
+  const sheet = document.getElementById('omni-day-sheet');
+  omniRulesCommit(`${r.reason} back on for ${formatDate(ds)}`);
+  if (sheet) omniDayOpen(ds);
+}
+
 // what Save would actually change — as a list, each undoable
 function omniDiaryPendingList(){
   if(!OMNI_DIARY_PENDING) return [];
@@ -4485,6 +4556,16 @@ function omniDayOpen(ds){
         <input type="text" value="${esc(generic(one.reason)?'':one.reason)}" placeholder="note\u2026" onchange="omniDayNote('${pp}','${ds}',this.value)" style="flex:1;min-width:80px;padding:5px 8px;border-radius:6px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:11px;">
       </div>`;
     }
+    // rule lines with skip / restore for this day
+    omniRuleBlocks(pp, ds).forEach(b => {
+      const idx = OMNI_STATE.rules.indexOf(b.rule);
+      inner += `<div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding-left:2px;font-size:11.5px;color:var(--muted);">${omniIconSvg(omniRuleIcon(b.rule),'line-ic')}<span style="flex:1;">${esc(b.reason)} ${b.allDay?'(all day)':esc(b.from+'\u2013'+b.to)} \u00b7 rule</span><button onclick="omniRuleSkipDay(${idx},'${ds}')" style="padding:5px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:11px;cursor:pointer;">Skip today</button></div>`;
+    });
+    (OMNI_STATE.rules||[]).forEach((r, idx) => {
+      if (!((r.people||[]).includes('ALL') || (r.people||[]).includes(pp))) return;
+      if (omniPausedForDay(r, ds) < 0 || !(r.days||[]).includes(parseDateStr(ds).getDay())) return;
+      inner += `<div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding-left:2px;font-size:11.5px;color:var(--muted);">${omniIconSvg(omniRuleIcon(r),'line-ic')}<span style="flex:1;">${esc(r.reason)} \u00b7 skipped today</span><button onclick="omniRuleRestoreDay(${idx},'${ds}')" style="padding:5px 9px;border-radius:7px;border:1px solid rgba(255,212,71,.35);background:rgba(255,212,71,.12);color:var(--accent);font-weight:700;font-size:11px;cursor:pointer;">Restore</button></div>`;
+    });
     inner += `</div>`;
   });
   inner += `<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px;font-size:12px;color:var(--muted);">`
@@ -4589,21 +4670,26 @@ function omniBuildDiaryPage(){
         rules.forEach(r=>parts.push(`${r.reason}${r.allDay?' (all day)':` ${r.from}\u2013${r.to}`} \u00b7 rule`));
         if (!parts.length) parts.push('free');
         const title=`${pp}: ${parts.join(' \u00b7 ')}`;
-        return `<button ${past?'disabled':''} onclick="omniDiaryToggle('${pp}','${ds}')" title="${esc(title)}" style="position:relative;height:28px;border-radius:6px;background:${bg};border:${border};cursor:${past?'default':'pointer'};opacity:${past?.35:1};padding:0;">${pp===people[0]?film:''}</button>`; }).join('');
+        const icon = omniCellIcon(pp, ds);
+        const icCol = (cur && !timed) ? '#0A0D16' : c;
+        return `<button ${past?'disabled':''} onclick="omniCellTap('${pp}','${ds}')" title="${esc(title)}" style="position:relative;height:28px;border-radius:6px;background:${bg};border:${border};cursor:${past?'default':'pointer'};opacity:${past?.35:1};padding:0;color:${icCol};">${icon?omniIconSvg(icon):''}${pp===people[0]?film:''}</button>`; }).join('');
     });
     strip += `</div></div>`;
   }
   strip += `<button onclick="omniDiaryMoreWeeks()" style="width:100%;padding:9px;border-radius:var(--radius-sm);background:var(--surface2);color:var(--muted);border:1px solid var(--border);font-weight:700;font-size:12px;cursor:pointer;margin-bottom:14px;">Show 4 more weeks</button>`;
 
   let html=`<div class="week-header"><h2>DIARY</h2><span class="subtitle">Tap a cell to mark busy or free \u00b7 tap a date for the day</span></div>`;
-  html+=bar;
-  html+=strip;
-  html+=`<div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-bottom:16px;font-size:11px;color:var(--muted);">
+  html+=`<div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:12px;font-size:11px;color:var(--muted);">
     <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${OMNI_PCOLORS.Owen};display:inline-block;"></span>busy all day</span>
     <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${OMNI_PCOLORS.Owen}66;border:1px solid ${OMNI_PCOLORS.Owen};display:inline-block;"></span>busy between times</span>
     <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${hatch(OMNI_PCOLORS.Owen)};border:1px solid var(--border);display:inline-block;"></span>rule</span>
     <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;border:2px dashed var(--accent);display:inline-block;"></span>unsaved</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span class=film-mark></span>film scheduled</span></div>`;
+    <span style="display:inline-flex;align-items:center;gap:5px;"><span class=film-mark></span>film scheduled</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('quiz','line-ic')}quiz</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('rl','line-ic')}rugby</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('fc','line-ic')}football</span></div>`;
+  html+=bar;
+  html+=strip;
 
   // range adder (unchanged)
   html+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;">
@@ -4660,7 +4746,7 @@ function omniRulesSection(){
       const on = r.enabled !== false;
       s += `<div style="border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:8px;opacity:${on?1:.55};">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" ${on?'checked':''} onchange="omniRuleToggle(${i},this.checked)"><b>${esc(r.reason||'Rule')}</b></label>
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" ${on?'checked':''} onchange="omniRuleToggle(${i},this.checked)">${omniIconSvg(omniRuleIcon(r),'line-ic')}<b>${esc(r.reason||'Rule')}</b></label>
           <span style="font-size:12px;color:var(--text);">${(r.people||[]).includes('ALL')?'<span class="attendee-chip" style="background:rgba(255,107,107,.15);color:var(--danger)">Everyone</span>':(r.people||[]).map(pp=>`<span class="attendee-chip ${chipClass(pp)}">${pp}</span>`).join(' ')}</span>
           <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">${esc(omniRuleText(r))}</span>
           <button onclick="omniRuleDelete(${i})" title="Delete rule" style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:17px;line-height:1;">\u00d7</button>
@@ -4681,6 +4767,7 @@ function omniRulesSection(){
         <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">When</div><select id="nr-mode" onchange="document.getElementById('nr-times').style.display=this.value==='times'?'flex':'none'" style="${inp}"><option value="all">All day</option><option value="times">Between times</option></select></div>
         <div id="nr-times" style="display:none;gap:6px;align-items:center;"><input type="time" id="nr-from" value="00:00" style="${inp}"><span style="font-size:11px;color:var(--muted);">to</span><input type="time" id="nr-to" value="19:35" style="${inp}"></div>
         <div style="flex:1;min-width:110px;"><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Reason</div><input type="text" id="nr-reason" placeholder="Work, quiz, football\u2026" style="width:100%;${inp}"></div>
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Symbol</div><select id="nr-icon" style="${inp}"><option value="">None</option><option value="quiz">Question mark</option><option value="rl">Rugby ball</option><option value="fc">Football</option></select></div>
         <button onclick="omniRuleAdd()" style="padding:9px 16px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:800;cursor:pointer;">Add rule</button>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:8px;">Example: the old Sunday block would be Owen \u00b7 Su \u00b7 between 00:00 and 15:00 \u00b7 "Work".</div>
@@ -4701,7 +4788,8 @@ function omniRuleAdd(){
   if(timed && (!from||!to||to<=from)){ omniToast('Give a start and a later end time','var(--danger)'); return; }
   if(!reason){ omniToast('Give the rule a name','var(--danger)'); return; }
   OMNI_STATE.rules = OMNI_STATE.rules || [];
-  OMNI_STATE.rules.push({ id:'r'+Date.now().toString(36), people:who.includes('ALL')?['ALL']:who, days, allDay:!timed, from, to, reason, paused:[], enabled:true });
+  const icon=(document.getElementById('nr-icon')||{}).value||'';
+  OMNI_STATE.rules.push({ id:'r'+Date.now().toString(36), people:who.includes('ALL')?['ALL']:who, days, allDay:!timed, from, to, reason, icon, paused:[], enabled:true });
   OMNI_RULES_OPEN = true;
   omniRulesCommit(`Rule added: ${reason}`);
 }
