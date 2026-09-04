@@ -1997,6 +1997,32 @@ function buildStatsPage() {
   }
 
   // Records box
+  // ---- prediction accuracy ----
+  const RA = (typeof omniRatingAccuracy==='function') ? omniRatingAccuracy() : null;
+  const SA = (typeof omniStartAccuracy==='function') ? omniStartAccuracy() : null;
+  html += `<div class="section-title">PREDICTIONS<span class="section-count">how close Claude gets</span></div>`;
+  html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;">
+    <div style="font-size:12px;font-weight:700;margin-bottom:2px;">Score predictions \u2014 our score minus predicted (/5)</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Above the line = we liked it more than predicted. ${RA&&RA.n?RA.n+' film'+(RA.n>1?'s':'')+' with both a prediction and a review.':'Nothing to compare yet \u2014 needs films that have both a prediction and a review.'}</div>`;
+  if (RA && RA.n){
+    html += `<canvas id="pred-chart" style="width:100%;height:170px;display:block;"></canvas>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;">` +
+      RA.summary.filter(s=>s.n).map(s=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;"><span class="attendee-chip ${chipClass(s.person)}">${s.person}</span><span style="font-family:var(--mono);color:var(--text);">\u00b1${s.mae}</span><span style="font-family:var(--mono);color:var(--muted);">${s.bias>0?'+':''}${s.bias} bias \u00b7 ${s.n}</span></span>`).join('') +
+      `</div><div style="font-size:10.5px;color:var(--muted);margin-top:6px;">\u00b1 is the average size of the miss; bias is which way it leans (+ means Claude under-rates you).</div>`;
+  }
+  html += `</div>`;
+  html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+    <div style="font-size:12px;font-weight:700;margin-bottom:2px;">Film-start predictions \u2014 minutes after the advertised time</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${SA&&SA.n?`Yellow = when the film actually started, grey = what we predicted. ${SA.n} recorded start${SA.n>1?'s':''}.`:'No recorded starts yet \u2014 use the Record start button when a film begins.'}</div>`;
+  if (SA && SA.n){
+    html += `<canvas id="start-chart" style="width:100%;height:170px;display:block;"></canvas>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;">
+        <span><span style="font-family:var(--mono);color:var(--text);">\u00b1${SA.mae} min</span> <span style="color:var(--muted);">average miss</span></span>
+        <span><span style="font-family:var(--mono);color:var(--text);">${SA.bias>0?'+':''}${SA.bias} min</span> <span style="color:var(--muted);">bias (+ = films start later than predicted)</span></span></div>` +
+      (SA.retro ? `<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">${SA.retro} of ${SA.n} were recorded before predictions were stored, so they're scored against today's rules applied backwards \u2014 newer records store the prediction that was actually made.</div>` : '');
+  }
+  html += `</div>`;
+
   html += `<div class="section-title">RECORDS</div>`;
   html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">`;
   html += recordRow('MAX', 'Most in a single day',
@@ -2069,6 +2095,8 @@ function buildStatsPage() {
     drawBarChart('day-chart',
       S.day_data.map(d => d.day.slice(0,3)),
       S.day_data.map(d => d.count));
+    if (RA && RA.n) drawMultiLineChart('pred-chart', RA.labels, RA.series, { signed:true, minSpan:1 });
+    if (SA && SA.n) drawMultiLineChart('start-chart', SA.labels, SA.series, { min:0, unit:'m' });
   });
 }
 
@@ -2133,6 +2161,47 @@ function drawLineChart(canvasId, labels, values, unit, maxOverride) {
     const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     ctx.fillStyle=muted; ctx.font='10px sans-serif'; ctx.textAlign='center';
     ctx.fillText(`${d.getDate()} ${mo[d.getMonth()]}`, pts[i].x, H-6);
+  });
+}
+
+// Several series on one axis; values may contain nulls (gaps). Symmetric axis
+// around zero when `signed` is true, so over/under-prediction read at a glance.
+function drawMultiLineChart(canvasId, labels, series, opts) {
+  opts = opts || {};
+  const canvas = document.getElementById(canvasId); if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 300, H = parseInt(canvas.style.height) || 180;
+  canvas.width = W*dpr; canvas.height = H*dpr; canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const pad = {top:14, right:16, bottom:28, left:40};
+  const cw = W-pad.left-pad.right, ch = H-pad.top-pad.bottom;
+  const muted = '#8A93AB', border = '#262E42';
+  const all = series.flatMap(s => s.values.filter(v => v !== null && v !== undefined));
+  let lo = opts.min !== undefined ? opts.min : Math.min(0, ...all), hi = opts.max !== undefined ? opts.max : Math.max(0, ...all);
+  if (opts.signed){ const m = Math.max(Math.abs(lo), Math.abs(hi), opts.minSpan||1); lo = -m; hi = m; }
+  if (hi === lo) hi = lo + 1;
+  const yOf = v => pad.top + ch - ((v-lo)/(hi-lo))*ch;
+  const xOf = i => pad.left + (i/(labels.length-1||1))*cw;
+  // gridlines: 5 steps
+  for (let k=0;k<=4;k++){
+    const v = lo + (hi-lo)*k/4, y = yOf(v);
+    ctx.strokeStyle = Math.abs(v) < 1e-9 ? muted : border; ctx.lineWidth = Math.abs(v) < 1e-9 ? 1.2 : 1;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(pad.left+cw,y); ctx.stroke();
+    ctx.fillStyle = muted; ctx.font='10px sans-serif'; ctx.textAlign='right';
+    ctx.fillText((v>0&&opts.signed?'+':'')+(Math.round(v*10)/10)+(opts.unit||''), pad.left-4, y+3);
+  }
+  series.forEach(s => {
+    ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.lineJoin='round';
+    let started = false; ctx.beginPath();
+    s.values.forEach((v,i) => { if (v===null||v===undefined){ started=false; return; } const x=xOf(i), y=yOf(v); if (!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y); });
+    ctx.stroke();
+    s.values.forEach((v,i) => { if (v===null||v===undefined) return; ctx.fillStyle=s.color; ctx.beginPath(); ctx.arc(xOf(i),yOf(v),3,0,Math.PI*2); ctx.fill(); });
+  });
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  [0, Math.floor(labels.length/2), labels.length-1].filter((v,i,a)=>a.indexOf(v)===i).forEach(i => {
+    if (!labels[i]) return; const d = parseDateStr(labels[i]);
+    ctx.fillStyle=muted; ctx.font='10px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`${d.getDate()} ${mo[d.getMonth()]}`, xOf(i), H-6);
   });
 }
 
@@ -3289,7 +3358,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r40 · supabase';
+const OMNI_BUILD = 'r41 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3905,6 +3974,50 @@ function omniLiveStats(){
   };
   OMNI_LIVE_STATS = S;
   return S;
+}
+
+// Prediction accuracy: our real scores vs Claude's predicted scores, per person.
+function omniRatingAccuracy(){
+  const rows = (typeof _reviewCache !== 'undefined' && Array.isArray(_reviewCache)) ? _reviewCache : [];
+  const pts = [];
+  rows.forEach(r => {
+    if (!r || !r.film || !OMNI_RULES.people.includes(r.person)) return;
+    const info = omniFilmInfo(r.film); const pred = info && info.predicted && info.predicted[r.person];
+    const actual = parseFloat(r.raw);
+    if (typeof pred !== 'number' || isNaN(actual)) return;
+    const d = omniIsoDate(r.date) || omniIsoDate(r.timestamp); if (!d) return;
+    pts.push({ date:d, film:omniNormTitle(r.film), person:r.person, actual, pred, err:+(actual-pred).toFixed(2) });
+  });
+  pts.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:a.film.localeCompare(b.film));
+  const films = []; pts.forEach(p => { const k=p.date+'|'+p.film; if (!films.includes(k)) films.push(k); });
+  const series = OMNI_RULES.people.map(pp => ({ name:pp, color:OMNI_PCOLORS[pp],
+    values: films.map(k => { const hit = pts.find(p => p.date+'|'+p.film===k && p.person===pp); return hit ? hit.err : null; }) }));
+  const summary = OMNI_RULES.people.map(pp => { const e = pts.filter(p=>p.person===pp).map(p=>p.err);
+    return { person:pp, n:e.length, mae: e.length ? +(e.reduce((a,b)=>a+Math.abs(b),0)/e.length).toFixed(2) : null,
+             bias: e.length ? +(e.reduce((a,b)=>a+b,0)/e.length).toFixed(2) : null }; });
+  return { labels: films.map(k=>k.split('|')[0]), films: films.map(k=>k.split('|')[1]), series, summary, n: films.length };
+}
+
+// Start-time accuracy: what we predicted vs when the film really began.
+// Uses the prediction stored at recording time when present; older rows are
+// scored against the current model applied retrospectively (flagged as such).
+function omniStartAccuracy(){
+  const rows = (OMNI_START_TIMES||[]).filter(r => r && r.date && !isNaN(Number(r.offset_mins)))
+    .slice().sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:String(a.advertised).localeCompare(String(b.advertised)));
+  let retro = 0;
+  const pts = rows.map(r => {
+    let pred = Number(r.predicted_mins);
+    if (isNaN(pred)){ pred = omniStartOffset({ start:r.advertised, screen:r.screen||'' }); retro++; }
+    return { date:r.date, film:r.film, actual:Number(r.offset_mins), pred, err:Number(r.offset_mins)-pred };
+  });
+  const errs = pts.map(p=>p.err);
+  return { labels: pts.map(p=>p.date), pts,
+    series: [ { name:'Actual', color:'#FFD447', values: pts.map(p=>p.actual) },
+              { name:'Predicted', color:'#8A93AB', values: pts.map(p=>p.pred) } ],
+    errSeries: [ { name:'Error', color:'#46E3A5', values: errs } ],
+    mae: errs.length ? +(errs.reduce((a,b)=>a+Math.abs(b),0)/errs.length).toFixed(1) : null,
+    bias: errs.length ? +(errs.reduce((a,b)=>a+b,0)/errs.length).toFixed(1) : null,
+    n: pts.length, retro };
 }
 
 // Ratings, straight from the reviews in the Sheet.
@@ -5171,14 +5284,21 @@ async function omniRecordStart(fromBoot){
   const actual = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
   const offset = Math.round((now.getTime() - omniShowingMs(date, start)) / 60000);
   const row = { film:title, date, screen: screen||'', advertised:start, actual, offset_mins:offset,
-                source:'app', recorded_at: now.toISOString() };
+                source:'app', recorded_at: now.toISOString(),
+                predicted_mins: omniStartOffset({ start, screen: screen||'' }) };   // what we thought, at the time
   OMNI_START_TIMES.push(row);                       // local first so the button can't double-fire
   const btn = host.querySelector('button');
   if (btn){ btn.disabled = true; btn.querySelector('.br-kicker, .rj-kicker').textContent = 'RECORDED ' + actual; }
   try {
     if (!sbConfigured()) throw new Error('not configured');
     if (typeof omniSaveBegin === 'function') omniSaveBegin();
-    await sb('start_times', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify([row]) });
+    try {
+      await sb('start_times', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify([row]) });
+    } catch(e){
+      if (!/predicted_mins/.test(String(e && e.message))) throw e;
+      const legacy = Object.assign({}, row); delete legacy.predicted_mins;   // column not added yet — don't lose the recording
+      await sb('start_times', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify([legacy]) });
+    }
     if (typeof omniSaveEnd === 'function') omniSaveEnd();
     omniToast(`Start recorded: ${actual} (+${offset} min)`,'var(--new)');
   } catch(e){
