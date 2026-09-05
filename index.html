@@ -3369,7 +3369,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r44 · supabase';
+const OMNI_BUILD = 'r46 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3395,6 +3395,13 @@ function omniNtfyDate(d){
 let OMNI_FILM_INFO = {};        // lower-cased title -> row
 async function sbGetFilmInfo(){
   return sb('film_info?select=*');
+}
+// Mean of the three predicted scores, or null when the film hasn't been looked up.
+function omniPredictedAvg(title){
+  const info = omniFilmInfo(title); const p = info && info.predicted;
+  if (!p) return null;
+  const v = OMNI_RULES.people.map(n => p[n]).filter(x => typeof x === 'number');
+  return v.length ? v.reduce((a,b)=>a+b,0) / v.length : null;
 }
 function omniFilmInfo(title){
   return OMNI_FILM_INFO[omniNormTitle(title).toLowerCase()] || null;
@@ -3780,7 +3787,11 @@ function omniBuildData(){
   }
   // 3) new films + committed films that lost their slot — place around the rest
   const fresh = candidates.filter(f => !decided[f.title] && !commitByTitle[f.title]);
-  const toPlace = needsRepick.concat(fresh).sort((a,b)=> a.watchable_count - b.watchable_count);
+  // Placement order decides who wins a clash for a slot: the film we're
+  // predicted to rate highest goes first; ties (and films with no prediction,
+  // which count as a middling 3.0) fall back to fewest-options-first.
+  const prio = f => { const r = omniPredictedAvg(f.title); return r === null ? 3.0 : r; };
+  const toPlace = needsRepick.concat(fresh).sort((a,b)=> (prio(b) - prio(a)) || (a.watchable_count - b.watchable_count));
   for (const f of toPlace){
     const s = omniPickBest(f.showings, taken);
     if (s){ decided[f.title] = { showing:s, locked:false }; taken.push(s);
@@ -4001,7 +4012,7 @@ function omniRatingAccuracy(){
     const actual = parseFloat(r.raw);
     if (typeof pred !== 'number' || isNaN(actual)) return;
     const d = omniIsoDate(r.date) || omniIsoDate(r.timestamp); if (!d) return;
-    const looked = omniIsoDate(info.looked_up_at); if (!looked || looked > d) return;   // prediction must pre-date the review
+    const looked = omniIsoDate(info.predicted_at) || omniIsoDate(info.looked_up_at); if (!looked || looked > d) return;   // the prediction itself must pre-date the review
     pts.push({ date:d, film:omniNormTitle(r.film), person:r.person, actual, pred, err:+(actual-pred).toFixed(2) });
   });
   pts.sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:a.film.localeCompare(b.film));
@@ -5390,7 +5401,8 @@ function omniShowFilmCard(title){
     + '<div style="flex:1;">'
     + `<div style="font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:.3px;line-height:1.15;">${esc(title)}</div>`;
   if (info){
-    const meta = [info.year, info.runtime_mins ? info.runtime_mins+' min' : '', info.director ? 'dir. '+info.director : '']
+    const meta = [info.year, info.runtime_mins ? info.runtime_mins+' min' : '', info.director ? 'dir. '+info.director : '',
+                  (info.writers||[]).length ? 'wr. '+info.writers.slice(0,2).join(', ') : '']
       .filter(Boolean).join(' · ');
     if (meta) inner += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px;">${esc(meta)}</div>`;
   }
@@ -5431,14 +5443,26 @@ function omniShowFilmCard(title){
         + 'color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:600;'
         + 'letter-spacing:0.8px;text-transform:uppercase;cursor:pointer;text-align:center;">'
         + 'Show predicted scores</button>';
-      inner += '<div id="fc-pred-row" style="display:none;margin:10px 18px 0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<span class=ntag style="margin:0;">PRED</span>'
+      const det = info.predicted_detail || {}, cats = ['enjoyment','story','characters','craft','atmosphere','ideas','originality'], ab = ['Enj','Sto','Cha','Cra','Atm','Ide','Ori'];
+      const hasDet = pp.some(n => det[n]);
+      const crit = info.critics || {};
+      inner += '<div id="fc-pred-row" style="display:none;margin:10px 18px 0;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);flex-direction:column;gap:8px;">'
+        + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><span class=ntag style="margin:0;">PRED</span>'
         + pp.map(n => `<span style="display:inline-flex;align-items:baseline;gap:5px;">`
             + `<span class="attendee-chip ${chipClass(n)}">${n}</span>`
             + `<span style="font-family:var(--mono);font-weight:600;font-size:13px;color:var(--text);">${pred[n].toFixed(1)}</span>`
             + `</span>`).join('')
-        + '<span style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-left:auto;">/5 predicted</span>'
-        + '</div>';
+        + '<span style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-left:auto;">/5 predicted</span></div>';
+      if (hasDet){
+        inner += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:var(--mono);font-size:10.5px;width:100%;">'
+          + '<tr><td></td>' + ab.map(a=>`<td style="color:var(--muted);text-align:center;padding:2px 3px;">${a}</td>`).join('') + '</tr>'
+          + pp.filter(n=>det[n]).map(n => `<tr><td style="color:${OMNI_PCOLORS[n]};font-weight:700;padding:2px 4px 2px 0;">${n}</td>`
+              + cats.map(c=>`<td style="text-align:center;padding:2px 3px;color:var(--text);">${typeof det[n][c]==='number'?det[n][c].toFixed(1):'\u2013'}</td>`).join('') + '</tr>').join('')
+          + '</table></div>';
+      }
+      if (crit.consensus)
+        inner += `<div style="font-size:11.5px;color:var(--muted);line-height:1.45;"><span class=ntag style="margin-right:6px;">CRITICS</span>${esc(crit.consensus)}${typeof crit.score_estimate==='number'?` <span style="font-family:var(--mono);">~${crit.score_estimate}/100</span>`:''}${typeof crit.audience_estimate==='number'?` <span style="font-family:var(--mono);">audience ~${crit.audience_estimate}</span>`:''}</div>`;
+      inner += '</div>';
     }
     inner += `<div style="padding:12px 18px 16px;font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);opacity:.65;">Looked up ${esc(info.looked_up_at||'')} · Claude</div>`;
   } else {
