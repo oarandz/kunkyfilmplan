@@ -950,6 +950,7 @@
 <h1><svg class="logomark" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-frame"/></svg>OMNIPLEX <span>WIGAN</span></h1>
   <div class="tab-row">
     <button class="tab active" onclick="showPage('week')">Calendar</button>
+    <button class="tab" onclick="showPage('reviews')">Reviews</button>
     <button class="tab" onclick="showPage('diary')">Diary</button>
     <button class="tab" onclick="showPage('data')">Data</button>
     <button class="tab" onclick="showPage('future')">Coming Up</button>
@@ -959,7 +960,6 @@
     <button class="tab" onclick="showPage('excluded')">Excluded</button>
     <button class="tab" onclick="showPage('missed')">Missed</button>
     <button class="tab" onclick="showPage('stats')">Stats</button>
-    <button class="tab" onclick="showPage('reviews')">Reviews</button>
     <button class="tab" onclick="openFoodAndDrink()">Food &amp; Drink</button>
     <button class="tab" onclick="showPage('fixtures')">Fixtures</button>
   </div>
@@ -1501,8 +1501,10 @@ function buildScreeningsPage() {
     return watchable.reduce((max, s) => s.date > max ? s.date : max, '0000');
   }
 
+  // Soonest upcoming screening first — what's on now or next sits at the top.
+  const nextDate = f => { const fut = f.showings.map(s => s.date).filter(d => d >= TODAY).sort(); return fut[0] || '9999'; };
   const allFilmsSorted = [...DATA.all_films].sort((a, b) =>
-    lastWatchableDate(a).localeCompare(lastWatchableDate(b))
+    nextDate(a).localeCompare(nextDate(b)) || lastWatchableDate(a).localeCompare(lastWatchableDate(b)) || a.title.localeCompare(b.title)
   );
   const newFilms = allFilmsSorted.filter(f => !f.is_rerelease);
   const reFilms = allFilmsSorted.filter(f => f.is_rerelease);
@@ -2907,6 +2909,57 @@ function setReviewFilter(filter) {
   renderReviewTable(_reviewCache);
 }
 
+// Where a /5 average sits on the scale — the SAME words the rating form uses
+// (RATING_LABELS, nearest half point), so it's one system end to end.
+function omniVerdict(avg){
+  const v = Number(avg);
+  if (isNaN(v)) return null;
+  const label = getRatingLabel(v);
+  if (!label) return null;
+  const r = Math.round(v * 2) / 2;
+  const c = r >= 4.0 ? 'var(--new)' : r >= 3.0 ? 'var(--accent)' : r >= 2.5 ? 'var(--muted)' : 'var(--danger)';
+  return { label: label.toUpperCase(), c };
+}
+// The stored explanation of the prediction model — written by the daily sync
+// only when the taste profiles change, so opening this never costs a call.
+let OMNI_MODEL_EXPLAIN = null;
+async function omniShowModelExplainer(){
+  const old = document.getElementById('omni-model-explainer'); if (old) old.remove();
+  const wrap = document.createElement('div'); wrap.id = 'omni-model-explainer';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(5,7,13,.72);z-index:9998;display:flex;align-items:center;justify-content:center;padding:18px;';
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  const card = document.createElement('div');
+  card.style.cssText = 'width:100%;max-width:440px;max-height:84vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);padding:16px 18px;';
+  card.innerHTML = '<div style="font-size:12px;color:var(--muted);">Loading\u2026</div>';
+  wrap.appendChild(card); document.body.appendChild(wrap);
+  if (!OMNI_MODEL_EXPLAIN){
+    try { const rows = await sb('prediction_model?id=eq.1&select=explanation,based_on,generated_at'); OMNI_MODEL_EXPLAIN = rows && rows[0] ? rows[0] : { explanation:{} }; }
+    catch(e){ OMNI_MODEL_EXPLAIN = { explanation:{}, error: String(e && e.message || e) }; }
+  }
+  const m = OMNI_MODEL_EXPLAIN, ex = m.explanation || {}, esc = omniEsc;
+  let inner = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+      <div style="font-family:var(--display);font-weight:800;font-size:18px;letter-spacing:.4px;">HOW THE PREDICTIONS WORK</div>
+      <button onclick="document.getElementById('omni-model-explainer').remove()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">\u00d7</button></div>`;
+  if (!ex.overview){
+    inner += `<div style="font-size:12.5px;color:var(--muted);line-height:1.5;">${m.error ? 'Couldn\u2019t load it: '+esc(m.error) : 'No explanation written yet \u2014 the daily sync writes one the first time it runs after this table exists (or run supabase_sync.py --explain).'}</div>`;
+  } else {
+    inner += `<div style="font-size:12.5px;line-height:1.55;white-space:pre-wrap;margin-bottom:14px;">${esc(ex.overview)}</div>`;
+    OMNI_RULES.people.forEach(pp => {
+      if (!ex[pp]) return;
+      inner += `<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+        <div style="margin-bottom:6px;"><span class="attendee-chip ${chipClass(pp)}">${pp}</span></div>
+        <div style="font-size:12.5px;line-height:1.55;white-space:pre-wrap;">${esc(ex[pp])}</div></div>`;
+    });
+    inner += `<div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);opacity:.65;margin-top:14px;">Built from ${esc(String(m.based_on||0))} reviews \u00b7 rewritten ${esc(m.generated_at||'')} \u00b7 updates only when your profiles change</div>`;
+  }
+  card.innerHTML = inner;
+}
+function omniJumpToReviewed(slug){
+  const el = document.getElementById('rv_' + slug); if (!el) return;
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  el.style.boxShadow = '0 0 0 2px var(--accent)';
+  setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+}
 async function loadReviews() {
   const container = document.getElementById('rev-table-container');
   if (!sbConfigured()) {
@@ -2984,17 +3037,30 @@ function renderReviewTable(data) {
   }
 
   const sortLabel = sortBy === 'overall' ? 'Overall' : CATEGORIES.find(c => c.id === sortBy)?.label;
-  let html = `<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${filmEntries.length} films · sorted by ${sortLabel}${_allReviewedOnly ? ' · all reviewed only' : ''}</div>`;
+  // most recently reviewed film (by timestamp, then date) — one tap to find it in the ranking
+  let latest = null;
+  (data || []).forEach(r => { const k = String(r.timestamp || r.date || ''); if (r && r.film && (!latest || k > latest.k)) latest = { film:r.film, k }; });
+  let html = '';
+  if (latest && filmEntries.some(f => f.film === latest.film)){
+    const pos = filmEntries.findIndex(f => f.film === latest.film) + 1;
+    html += `<button onclick="omniJumpToReviewed('${latest.film.replace(/[^a-z0-9]/gi,'')}')" style="display:flex;align-items:center;gap:8px;width:100%;margin-bottom:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;text-align:left;">
+      <span class=ntag style="margin:0;">LAST REVIEWED</span><span style="flex:1;font-weight:700;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${latest.film}</span><span style="font-family:var(--mono);font-size:10.5px;color:var(--muted);">#${pos} \u2193</span></button>`;
+  }
+  html += `<button onclick="omniShowModelExplainer()" style="display:flex;align-items:center;gap:8px;width:100%;margin-bottom:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;text-align:left;">
+    <span class=ntag style="margin:0;">MODEL</span><span style="flex:1;font-weight:700;font-size:12.5px;">How the predictions work right now</span><span style="font-family:var(--mono);font-size:10.5px;color:var(--muted);">per person \u2192</span></button>`;
+  html += `<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">${filmEntries.length} films · sorted by ${sortLabel}${_allReviewedOnly ? ' · all reviewed only' : ''}</div>`;
 
   // ── RANKINGS TABLE ──
   filmEntries.forEach((item, rank) => {
     const scoreVal = sortBy === 'overall' ? item.avg : (item.catAvgs[sortBy] || 0);
-    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;">`;
+    html += `<div id="rv_${item.film.replace(/[^a-z0-9]/gi,'')}" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;transition:box-shadow .3s ease;">`;
     html += `<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px;">`;
     html += `<span style="font-family:'Archivo',sans-serif;font-size:16px;color:var(--muted);">#${rank+1}</span>`;
     html += `<span class="film-name" style="font-size:14px;font-weight:600;color:var(--text);flex:1;">${item.film}</span>`;
     html += `<span style="font-family:'Archivo',sans-serif;font-size:28px;color:var(--accent);line-height:1;">${scoreVal.toFixed(2)}</span>`;
     html += `</div>`;
+    { const vd = omniVerdict(item.avg);   // always the overall verdict, whatever the sort
+      if (vd) html += `<div style="margin:-2px 0 6px;"><span class=ntag style="color:${vd.c};border-color:${vd.c}55;background:${vd.c}14;margin:0;">${vd.label}</span></div>`; }
     // Per-person scores with visual line
     if (item.reviews.length > 1) {
       // Score line
@@ -3369,7 +3435,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r46 · supabase';
+const OMNI_BUILD = 'r50 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
