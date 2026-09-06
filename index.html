@@ -952,15 +952,11 @@
     <button class="tab active" onclick="showPage('week')">Calendar</button>
     <button class="tab" onclick="showPage('reviews')">Reviews</button>
     <button class="tab" onclick="showPage('diary')">Diary</button>
-    <button class="tab" onclick="showPage('data')">Data</button>
     <button class="tab" onclick="showPage('future')">Coming Up</button>
     <button class="tab" onclick="showPage('screenings')">All Screenings</button>
-    <button class="tab" onclick="showPage('impossible')">Can't Watch</button>
-    <button class="tab" onclick="showPage('kids')">Kids Removed</button>
     <button class="tab" onclick="showPage('excluded')">Excluded</button>
     <button class="tab" onclick="showPage('missed')">Missed</button>
     <button class="tab" onclick="showPage('stats')">Stats</button>
-    <button class="tab" onclick="openFoodAndDrink()">Food &amp; Drink</button>
     <button class="tab" onclick="showPage('fixtures')">Fixtures</button>
   </div>
 </div>
@@ -1334,7 +1330,7 @@ function buildWeekPage() {
 
         html += `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">`;
         html += `<div style="flex:1;min-width:0;">`;
-        html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">${typeBadge(f.title, f.is_rerelease, s.is_maxx, f.is_estimated)}${ratingBadge(f.rating)}</div>`;
+        html += `<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;">${typeBadge(f.title, f.is_rerelease, s.is_maxx, f.is_estimated)}${ratingBadge(f.rating)}${(typeof omniIsBooked==='function' && omniIsBooked(f.title, s.date)) ? '<span class=ntag style="color:var(--new);border-color:rgba(70,227,165,.35);background:rgba(70,227,165,.1);">BOOKED</span>' : ''}</div>`;
         html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">`;
         html += `<div class="film-name">${f.title}</div>`;
         html += `<button onclick="omniOpenLock(\`${f.title.replace(/\`/g,'')}\`)" title="Lock / move this film" style="background:none;border:1px solid var(--border);border-radius:6px;color:${f.fixed_date?'var(--accent)':'var(--muted)'};font-size:11px;padding:2px 6px;cursor:pointer;white-space:nowrap;">${f.fixed_date?'<svg class=ic><use href=#ic-lock/></svg>Locked':'<svg class=ic><use href=#ic-unlock/></svg>Lock'}</button>`;
@@ -1677,7 +1673,13 @@ function buildScreeningsPage() {
   html += renderByDate();
   html += `</div>`;
 
+  // Uploads, list editors and the build stamp — the old Data tab, folded in here.
+  html += `<div style="margin-top:18px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);">
+    <div onclick="OMNI_DATA_OPEN=!OMNI_DATA_OPEN;buildScreeningsPage();" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;cursor:pointer;">
+      <span style="font-weight:700;">Uploads &amp; data</span><span style="color:var(--muted);">${OMNI_DATA_OPEN?'\u25be':'\u25b8'}</span></div>
+    <div id="page-data-inline" style="display:${OMNI_DATA_OPEN?'block':'none'};padding:0 14px 14px;"></div></div>`;
   el.innerHTML = html;
+  if (typeof omniBuildDataPage === 'function') try { omniBuildDataPage(); } catch(e){}
 }
 
 function addDays(dateStr, n) {
@@ -2010,6 +2012,37 @@ function buildStatsPage() {
   }
 
   // Records box
+  // ---- the three of you ----
+  const PS = (typeof omniPeopleStats==='function') ? omniPeopleStats() : null;
+  if (PS && PS.films >= 3){
+    const P = OMNI_RULES.people, esc = omniEsc;
+    html += `<div class="section-title">THE THREE OF YOU<span class="section-count">${PS.films} films</span></div>`;
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">`;
+    // harshest critic
+    if (PS.harsh.length >= 2){
+      const h0 = PS.harsh[0], g0 = PS.harsh[PS.harsh.length-1];
+      html += recordRow('HARSH', 'Harshest critic', h0.person, `averages ${h0.mean.toFixed(2)}/5 over ${h0.n} films \u00b7 ${g0.person} the most generous at ${g0.mean.toFixed(2)}`);
+    }
+    // agreement grid
+    html += `<div style="padding:10px 14px;border-bottom:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px;">Agreement \u2014 average gap between scores</div>
+      <table style="border-collapse:collapse;font-family:var(--mono);font-size:11.5px;">
+        <tr><td></td>${P.map(pp=>`<td style="padding:3px 10px;color:${OMNI_PCOLORS[pp]};font-weight:700;">${pp}</td>`).join('')}</tr>`
+      + P.map(a => `<tr><td style="padding:3px 10px 3px 0;color:${OMNI_PCOLORS[a]};font-weight:700;">${a}</td>` + P.map(b => {
+          if (a===b) return `<td style="padding:3px 10px;color:var(--muted);text-align:center;">\u2013</td>`;
+          const g = PS.grid[a+'|'+b]; const v = g && g.gap !== null ? g.gap.toFixed(2) : '\u2013';
+          const col = g && g.gap !== null ? (g.gap <= 0.5 ? 'var(--new)' : g.gap <= 0.9 ? 'var(--accent)' : 'var(--danger)') : 'var(--muted)';
+          return `<td style="padding:3px 10px;text-align:center;color:${col};">${v}</td>`; }).join('') + '</tr>').join('')
+      + `</table>` + (PS.pairs.length ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Closest: ${PS.pairs[0].a} &amp; ${PS.pairs[0].b} (${PS.pairs[0].gap}) \u00b7 Furthest: ${PS.pairs[PS.pairs.length-1].a} &amp; ${PS.pairs[PS.pairs.length-1].b} (${PS.pairs[PS.pairs.length-1].gap})</div>` : '') + `</div>`;
+    // biggest disagreements
+    PS.dis.slice(0,3).forEach((d,i) => html += recordRow(i===0?'SPLIT':'\u00a0', i===0?'Biggest disagreements':'\u00a0', d.film,
+      d.scores.map(s=>`${s.person} ${s.v.toFixed(1)}`).join(' \u00b7 ') + ` \u2014 ${d.spread} apart`));
+    // who Claude predicts best
+    if (PS.acc.length) html += recordRow('PRED', 'Who Claude predicts best', PS.acc[0].person,
+      PS.acc.map(a=>`${a.person} \u00b1${a.mae}`).join(' \u00b7 ') + ' (average miss, /5)');
+    html += `<div style="height:1px;"></div></div>`;
+  }
+
   // ---- prediction accuracy ----
   const RA = (typeof omniRatingAccuracy==='function') ? omniRatingAccuracy() : null;
   const SA = (typeof omniStartAccuracy==='function') ? omniStartAccuracy() : null;
@@ -2080,19 +2113,6 @@ function buildStatsPage() {
   // Day of week
   html += `<div class="section-title">FAVOURITE DAY TO GO</div>`;
   html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;"><canvas id="day-chart" style="width:100%;height:140px;display:block;"></canvas></div>`;
-
-  // Film popularity
-  html += `<div class="section-title">FILMS WATCHED BY POPULARITY<span class="section-count">screenings when seen</span></div>`;
-  html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:16px;">`;
-  STATS.film_popularity.forEach((f, i) => {
-    const barPct = Math.round(f.screenings / STATS.film_popularity[0].screenings * 100);
-    html += `<div style="padding:8px 14px;${i>0?'border-top:1px solid var(--border);':''}display:flex;align-items:center;gap:10px;">`;
-    html += `<span style="font-size:11px;color:var(--muted);min-width:18px;text-align:right">${i+1}</span>`;
-    html += `<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.title}</div>`;
-    html += `<div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;"><div style="height:4px;width:${barPct}%;background:var(--accent);border-radius:2px;"></div></div></div>`;
-    html += `<span style="font-size:12px;font-weight:600;color:var(--accent);flex-shrink:0;">${f.screenings}</span></div>`;
-  });
-  html += `</div>`;
 
   el.innerHTML = html;
 
@@ -2247,7 +2267,8 @@ function drawBarChart(canvasId, labels, values) {
       ctx.fillText(v, x+barW/2, y-3);
     }
     ctx.fillStyle=muted; ctx.font='10px sans-serif'; ctx.textAlign='center';
-    ctx.fillText(labels[i], x+barW/2, H-6);
+    { const per = 34, step = Math.max(1, Math.ceil(labels.length / Math.max(1, Math.floor(cw / per))));
+      if (i % step === 0 || i === labels.length - 1) ctx.fillText(labels[i], x+barW/2, H-6); }
   });
 }
 
@@ -3435,7 +3456,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r50 · supabase';
+const OMNI_BUILD = 'r53 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3546,8 +3567,12 @@ function omniFixtureBlocks(f, person){
   return b.split(/[,;]/).map(s => s.trim()).filter(Boolean).includes(person);
 }
 // Returns the fixture that puts `person` at work on this date, or null.
+function omniMatchFree(dateStr, person){
+  return (OMNI_STATE.matchFree||[]).some(x => x && x.date === dateStr && x.person === person);
+}
 function omniMatchDay(dateStr, person){
   person = person || 'Conor';
+  if (omniMatchFree(dateStr, person)) return null;      // marked free for this match day
   if (OMNI_FIXTURES.length){
     for (const f of OMNI_FIXTURES){
       if (f.date === dateStr && omniFixtureBlocks(f, person)) return f;
@@ -3588,6 +3613,8 @@ let OMNI_STATE = {
   sportRemoved: [],
   rules: [],          // recurring availability rules (see omniRuleBlocks)
   seen: [],           // {title,date,start,end,screen} — what we actually went to (feeds today's greyed cards)
+  matchFree: [],      // {date, person} — "not working this match day" overrides
+  booked: [],         // {title, date} — tickets bought for this scheduled showing
 };
 let OMNI_SCRAPE = null;   // in-memory raw scrape (array), loaded from Sheet or upload
 
@@ -4065,6 +4092,33 @@ function omniLiveStats(){
   return S;
 }
 
+// The three of you, side by side — computed from the reviews in hand.
+function omniPeopleStats(){
+  const rows = (typeof _reviewCache !== 'undefined' && Array.isArray(_reviewCache)) ? _reviewCache : [];
+  const P = OMNI_RULES.people;
+  const byFilm = {};
+  rows.forEach(r => { const v = parseFloat(r.raw); if (!r || !r.film || isNaN(v) || !P.includes(r.person)) return;
+    const t = omniNormTitle(r.film); (byFilm[t] = byFilm[t] || {})[r.person] = v; });
+  const per = P.map(pp => { const v = Object.values(byFilm).map(f => f[pp]).filter(x => typeof x === 'number');
+    return { person:pp, n:v.length, mean: v.length ? +(v.reduce((a,b)=>a+b,0)/v.length).toFixed(2) : null }; });
+  const harsh = per.filter(x=>x.n>=3).sort((a,b)=>a.mean-b.mean);
+  // pairwise agreement: mean absolute gap over co-reviewed films
+  const pairs = [];
+  for (let i=0;i<P.length;i++) for (let j=i+1;j<P.length;j++){
+    const both = Object.values(byFilm).filter(f => typeof f[P[i]]==='number' && typeof f[P[j]]==='number');
+    const gap = both.length ? +(both.reduce((a,f)=>a+Math.abs(f[P[i]]-f[P[j]]),0)/both.length).toFixed(2) : null;
+    pairs.push({ a:P[i], b:P[j], n:both.length, gap });
+  }
+  const grid = {}; pairs.forEach(pr => { grid[pr.a+'|'+pr.b] = pr; grid[pr.b+'|'+pr.a] = pr; });
+  // biggest disagreements: films with the widest spread among those who reviewed
+  const dis = Object.keys(byFilm).map(t => { const v = P.filter(pp=>typeof byFilm[t][pp]==='number');
+      if (v.length < 2) return null; const vals = v.map(pp=>byFilm[t][pp]);
+      return { film:t, spread:+(Math.max(...vals)-Math.min(...vals)).toFixed(1), scores: v.map(pp=>({person:pp, v:byFilm[t][pp]})).sort((a,b)=>b.v-a.v) }; })
+    .filter(Boolean).sort((a,b)=>b.spread-a.spread).slice(0,5);
+  const acc = (typeof omniRatingAccuracy==='function') ? omniRatingAccuracy().summary.filter(s=>s.n>=2).sort((a,b)=>a.mae-b.mae) : [];
+  return { per, harsh, pairs: pairs.filter(p=>p.n>=3).sort((a,b)=>a.gap-b.gap), grid, dis, acc, films:Object.keys(byFilm).length };
+}
+
 // Prediction accuracy: our real scores vs Claude's predicted scores, per person.
 // A point only counts when the prediction genuinely came first — the film was
 // looked up on or before the day it was reviewed. Predictions made after the
@@ -4169,6 +4223,8 @@ async function omniLoadAll(){
   OMNI_STATE.sportRemoved= (DATA.sport_removed||[]).slice();
   OMNI_STATE.rules = JSON.parse(JSON.stringify(OMNI_DEFAULT_RULES));
   OMNI_STATE.seen = [];
+  OMNI_STATE.matchFree = [];
+  OMNI_STATE.booked = [];
   OMNI_STATE.committed   = (DATA.schedule||[]).map(omniSerialiseCommitted); // seed from embedded snapshot
 
   if (!sbConfigured()){
@@ -4191,6 +4247,8 @@ async function omniLoadAll(){
       if (Array.isArray(s.sportRemoved)) OMNI_STATE.sportRemoved = s.sportRemoved;
       OMNI_STATE.rules = Array.isArray(s.rules) ? s.rules : JSON.parse(JSON.stringify(OMNI_DEFAULT_RULES));   // first run after upgrade: seed the old built-ins as editable rules
       OMNI_STATE.seen = Array.isArray(s.seen) ? s.seen : [];
+      OMNI_STATE.matchFree = Array.isArray(s.matchFree) ? s.matchFree : [];
+      OMNI_STATE.booked = Array.isArray(s.booked) ? s.booked : [];
     } else { ok = true; stateNote = 'empty — first run'; }
   } catch(e){ stateNote = e.message; if (e.status === 404) missingTables = true; }
   omniBootStep('state', ok ? 'ok' : 'fail', stateNote);
@@ -4391,7 +4449,7 @@ function omniSaveState(){
   omniSaveBegin();
   sbSaveState({ diary:OMNI_STATE.diary, locks:OMNI_STATE.locks,
       committed:OMNI_STATE.committed, watched:OMNI_STATE.watched, doNotWatch:OMNI_STATE.doNotWatch,
-      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved, rules:OMNI_STATE.rules, seen:OMNI_STATE.seen })
+      kidsRemoved:OMNI_STATE.kidsRemoved, sportRemoved:OMNI_STATE.sportRemoved, rules:OMNI_STATE.rules, seen:OMNI_STATE.seen, matchFree:OMNI_STATE.matchFree, booked:OMNI_STATE.booked })
     .then(()=>{ omniToast('Saved ✓','var(--new)'); omniSaveEnd();
       sbWriteScheduleMirror(OMNI_STATE.committed).catch(()=>{}); })
     .catch(e=>{ omniToast('Save FAILED: '+e.message,'var(--danger)'); omniSetStatus('unsaved'); omniSaveEnd(); });
@@ -4476,7 +4534,9 @@ function omniFingerprint(o){
   const lk = (o.locks||[]).map(l => l.title+'@'+l.date+'T'+l.start).sort().join(';');
   const ru = (o.rules||[]).map(r => JSON.stringify([r.id, (r.people||[]).slice().sort(), (r.days||[]).slice().sort(), !!r.allDay, r.from||'', r.to||'', r.reason||'', (r.paused||[]).map(p=>p.from+'>'+p.to).sort(), r.enabled!==false])).sort().join(';');
   const sn = (o.seen||[]).map(x => x.title+'@'+x.date+'T'+(x.start||'')).sort().join(';');
-  return [cm, dy, lk, list(o.watched), list(o.doNotWatch), list(o.kidsRemoved), list(o.sportRemoved), ru, sn].join('||');
+  const mf = (o.matchFree||[]).map(x => x.person+'@'+x.date).sort().join(';');
+  const bk = (o.booked||[]).map(x => x.title+'@'+x.date).sort().join(';');
+  return [cm, dy, lk, list(o.watched), list(o.doNotWatch), list(o.kidsRemoved), list(o.sportRemoved), ru, sn, mf, bk].join('||');
 }
 function omniSaveBegin(){ OMNI_SAVING++; omniSetStatus('saving'); }
 function omniSaveEnd(){
@@ -4649,8 +4709,51 @@ function omniCellTap(person, ds){
   const P = OMNI_DIARY_PENDING || OMNI_STATE.diary;
   const manual = omniDiaryEntry(P, person, ds) || omniDiaryAllEntry(P, ds);
   const blocks = omniRuleBlocks(person, ds), mf = omniMatchDay(ds, person);
-  if (manual || (!blocks.length && !mf)) { omniDiaryToggle(person, ds); return; }
-  omniRuleChooser(person, ds, blocks, mf);
+  if (manual) { omniDayOpen(ds); return; }                      // edit / free / change times there
+  if (blocks.length || mf) { omniRuleChooser(person, ds, blocks, mf); return; }
+  omniAddBusySheet(person, ds);
+}
+// Free cell tapped: mark busy for the whole day or just some hours, with a note.
+function omniAddBusySheet(person, ds){
+  const old = document.getElementById('omni-add-busy'); if (old) old.remove();
+  const esc = omniEsc;
+  const wrap = document.createElement('div'); wrap.id = 'omni-add-busy';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(5,7,13,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;';
+  wrap.addEventListener('click', e => { if (e.target === wrap) wrap.remove(); });
+  const inp = 'padding:8px;border-radius:7px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:12.5px;';
+  wrap.innerHTML = `<div style="width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-2);">
+    <div style="font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:.3px;margin-bottom:2px;">${esc(person)} busy \u00b7 ${esc(formatFullDate(ds))}</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px;">Goes into the unsaved list \u2014 press Save on the Diary to apply.</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button id="ab-all" onclick="omniAddBusyMode('all')" style="flex:1;${inp}font-weight:800;background:var(--accent);color:var(--bg);border-color:var(--accent);">All day</button>
+      <button id="ab-times" onclick="omniAddBusyMode('times')" style="flex:1;${inp}font-weight:800;">Between times</button></div>
+    <div id="ab-time-row" style="display:none;align-items:center;gap:6px;margin-bottom:10px;">
+      <input type="time" id="ab-from" value="18:00" style="${inp}"><span style="font-size:11px;color:var(--muted);">to</span><input type="time" id="ab-to" value="22:00" style="${inp}"></div>
+    <input type="text" id="ab-note" placeholder="note (optional) \u2014 gig, away, dinner\u2026" style="width:100%;${inp}margin-bottom:12px;">
+    <div style="display:flex;gap:8px;">
+      <button onclick="document.getElementById('omni-add-busy').remove()" style="flex:1;${inp}color:var(--muted);">Cancel</button>
+      <button onclick="omniAddBusyConfirm('${esc(person)}','${ds}')" style="flex:2;${inp}font-weight:800;background:var(--accent);color:var(--bg);border-color:var(--accent);">Add to draft</button></div></div>`;
+  document.body.appendChild(wrap);
+}
+function omniAddBusyMode(mode){
+  const all = document.getElementById('ab-all'), tm = document.getElementById('ab-times'), row = document.getElementById('ab-time-row');
+  const on = 'background:var(--accent);color:var(--bg);border-color:var(--accent);', off = 'background:var(--surface2);color:var(--text);border-color:var(--border);';
+  all.style.cssText += mode==='all' ? on : off; tm.style.cssText += mode==='times' ? on : off;
+  row.style.display = mode==='times' ? 'flex' : 'none';
+  row.dataset.mode = mode;
+}
+function omniAddBusyConfirm(person, ds){
+  const row = document.getElementById('ab-time-row'); const timed = row && row.dataset.mode === 'times';
+  const from = timed ? document.getElementById('ab-from').value : '', to = timed ? document.getElementById('ab-to').value : '';
+  if (timed && (!from || !to || to <= from)){ omniToast('Give a start and a later end time','var(--danger)'); return; }
+  const note = (document.getElementById('ab-note').value||'').trim();
+  if(!OMNI_DIARY_PENDING) OMNI_DIARY_PENDING=omniCloneDiary(OMNI_STATE.diary);
+  const P = OMNI_DIARY_PENDING;
+  const all = omniDiaryAllEntry(P, ds);
+  if (!omniDiaryEntry(P, person, ds) && !all)
+    P.push(Object.assign({ date:ds, person, reason: note || 'Not available' }, timed ? { from, to } : {}));
+  document.getElementById('omni-add-busy').remove();
+  omniBuildDiaryPage();
 }
 function omniRuleChooser(person, ds, blocks, mf){
   const old = document.getElementById('omni-rule-chooser'); if (old) old.remove();
@@ -4666,11 +4769,18 @@ function omniRuleChooser(person, ds, blocks, mf){
     const idx = OMNI_STATE.rules.indexOf(b.rule);
     inner += `<button onclick="omniRuleSkipDay(${idx},'${ds}')" style="${btn}">${omniIconSvg(omniRuleIcon(b.rule),'line-ic')}<span style="flex:1;">Skip <b>${esc(b.reason)}</b> for this day</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted);">${b.allDay?'all day':esc(b.from+'\u2013'+b.to)}</span></button>`;
   });
-  if (mf) inner += `<div style="${btn}cursor:default;color:var(--muted);">${omniIconSvg(mf.sport==='rl'?'rl':'fc','line-ic')}<span style="flex:1;font-weight:600;">${esc(omniMatchDayText(mf))}</span><span style="font-family:var(--mono);font-size:10px;">fixture</span></div>
-    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Match days come from the fixtures upload \u2014 remove the row in the <b>fixtures</b> table to override.</div>`;
+  if (mf) inner += `<button onclick="omniMatchFreeSet('${esc(person)}','${ds}',true)" style="${btn}">${omniIconSvg(mf.sport==='rl'?'rl':'fc','line-ic')}<span style="flex:1;">${esc(person)} is <b>free</b> \u2014 not working this match</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted);">${esc(omniMatchDayText(mf).replace(/^..? \u00b7 /,''))}</span></button>`;
   inner += `<button onclick="document.getElementById('omni-rule-chooser').remove();omniDiaryToggle('${esc(person)}','${ds}')" style="${btn}"><span style="flex:1;">Mark busy for another reason too</span></button>
     <button onclick="document.getElementById('omni-rule-chooser').remove()" style="${btn}background:none;border-color:transparent;color:var(--muted);justify-content:center;">Cancel</button></div>`;
   wrap.innerHTML = inner; document.body.appendChild(wrap);
+}
+function omniMatchFreeSet(person, ds, free){
+  OMNI_STATE.matchFree = (OMNI_STATE.matchFree||[]).filter(x => !(x.date === ds && x.person === person));
+  if (free) OMNI_STATE.matchFree.push({ date:ds, person });
+  const c = document.getElementById('omni-rule-chooser'); if (c) c.remove();
+  const sheet = document.getElementById('omni-day-sheet');
+  omniRulesCommit(free ? `${person} marked free for the match on ${formatDate(ds)}` : `${person} back to working the match on ${formatDate(ds)}`);
+  if (sheet) omniDayOpen(ds);
 }
 function omniRuleSkipDay(i, ds){
   const r = OMNI_STATE.rules[i]; if (!r) return;
@@ -4775,6 +4885,9 @@ function omniDayOpen(ds){
       const idx = OMNI_STATE.rules.indexOf(b.rule);
       inner += `<div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding-left:2px;font-size:11.5px;color:var(--muted);">${omniIconSvg(omniRuleIcon(b.rule),'line-ic')}<span style="flex:1;">${esc(b.reason)} ${b.allDay?'(all day)':esc(b.from+'\u2013'+b.to)} \u00b7 rule</span><button onclick="omniRuleSkipDay(${idx},'${ds}')" style="padding:5px 9px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:11px;cursor:pointer;">Skip today</button></div>`;
     });
+    if (omniMatchFree(ds, pp)){
+      inner += `<div style="display:flex;align-items:center;gap:8px;margin-top:7px;padding-left:2px;font-size:11.5px;color:var(--muted);"><span style="flex:1;">Match day \u00b7 marked free</span><button onclick="omniMatchFreeSet('${pp}','${ds}',false)" style="padding:5px 9px;border-radius:7px;border:1px solid rgba(255,212,71,.35);background:rgba(255,212,71,.12);color:var(--accent);font-weight:700;font-size:11px;cursor:pointer;">Working after all</button></div>`;
+    }
     (OMNI_STATE.rules||[]).forEach((r, idx) => {
       if (!((r.people||[]).includes('ALL') || (r.people||[]).includes(pp))) return;
       if (omniPausedForDay(r, ds) < 0 || !(r.days||[]).includes(parseDateStr(ds).getDay())) return;
@@ -4848,7 +4961,16 @@ function omniBuildDiaryPage(){
   // ---- strip ----
   const start = parseDateStr(todayStr); start.setDate(start.getDate() - ((start.getDay()+6)%7));   // Monday of this week
   const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const hatch = c => `repeating-linear-gradient(135deg, ${c}55 0 3px, transparent 3px 7px)`;
+  const RED = '#FF6B6B';
+  const stripes = `repeating-linear-gradient(135deg, ${RED}66 0 3px, transparent 3px 7px)`;
+  var CELL = {
+    busyAll:   `background:${RED};`,
+    busyPart:  `background:linear-gradient(to top, ${RED} 0 50%, var(--surface2) 50%);`,
+    autoAll:   `background:${stripes};`,
+    autoPart:  `background:linear-gradient(to top, transparent 0 50%, var(--surface2) 50%), ${stripes};`,
+    free:      `background:var(--surface2);`,
+  };
+  const hatch = c => stripes;   // (kept for any older callers)
   let strip='';
   for (let w=0; w<OMNI_DIARY_WEEKS; w++){
     const days=[]; for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(start.getDate()+w*7+i); days.push(d); }
@@ -4864,8 +4986,8 @@ function omniBuildDiaryPage(){
         <div style="font-family:var(--mono);font-size:12px;font-weight:600;color:${isT?'var(--accent)':'var(--text)'};">${d.getDate()}</div></button>`; }).join('');
     // person rows
     people.forEach(pp => {
-      const c=OMNI_PCOLORS[pp];
-      strip += `<div style="display:flex;align-items:center;font-size:11px;font-weight:700;color:${c};padding-left:2px;">${pp}</div>`;
+      const c=RED;
+      strip += `<div style="display:flex;align-items:center;font-size:11px;font-weight:700;color:var(--muted);padding-left:2px;">${pp}</div>`;
       strip += days.map(d=>{ const ds=iso(d); const past=ds<todayStr;
         const one=omniDiaryEntry(P,pp,ds), all=omniDiaryAllEntry(P,ds);
         const rules=omniStructuralOff(ds).filter(s=>s.person===pp);
@@ -4873,11 +4995,11 @@ function omniBuildDiaryPage(){
         const cur=one||all, changed = (!!cur!==!!savedOne) || (cur&&savedOne&&((cur.from||'')!==(savedOne.from||'')||(cur.to||'')!==(savedOne.to||'')));
         const timed = cur && cur.from && cur.to;
         const ruleAll = rules.find(r=>r.allDay), ruleTimed = rules.find(r=>!r.allDay);
-        let bg='var(--surface2)', border=changed?'2px dashed var(--accent)':'1px solid var(--border)';
-        if (cur && !timed) bg = c;                                          // busy all day: solid
-        else if (cur && timed){ bg = c+'66'; if(!changed) border = `1px solid ${c}`; }   // busy between times: tinted, solid edge
-        else if (ruleAll) bg = hatch(c);                                    // rule, all day: hatched
-        else if (ruleTimed) bg = hatch(c+'99');                             // rule, between times: light hatch
+        let bgCss = CELL.free, border=changed?'2px dashed var(--accent)':'1px solid var(--border)';
+        if (cur && !timed) bgCss = CELL.busyAll;          // solid red: busy all day
+        else if (cur && timed) bgCss = CELL.busyPart;     // bottom half red: busy part of the day
+        else if (ruleAll) bgCss = CELL.autoAll;           // stripes: automatic (rule or match), all day
+        else if (ruleTimed) bgCss = CELL.autoPart;        // stripes in the bottom half: automatic, part of the day
         const film=(filmsByDay[ds]||[]).length ? '<span class=film-mark style="position:absolute;top:3px;right:3px;"></span>' : '';
         const parts=[];
         if (cur) parts.push(`${(all&&!one)?'Everyone: ':''}${cur.reason||'not available'}${timed?` ${cur.from}\u2013${cur.to}`:' (all day)'}`);
@@ -4885,23 +5007,26 @@ function omniBuildDiaryPage(){
         if (!parts.length) parts.push('free');
         const title=`${pp}: ${parts.join(' \u00b7 ')}`;
         const icon = omniCellIcon(pp, ds);
-        const icCol = (cur && !timed) ? '#0A0D16' : c;
-        return `<button ${past?'disabled':''} onclick="omniCellTap('${pp}','${ds}')" title="${esc(title)}" style="position:relative;height:28px;border-radius:6px;background:${bg};border:${border};cursor:${past?'default':'pointer'};opacity:${past?.35:1};padding:0;color:${icCol};">${icon?omniIconSvg(icon):''}${pp===people[0]?film:''}</button>`; }).join('');
+        const icCol = (cur && !timed) ? '#0A0D16' : RED;
+        return `<button ${past?'disabled':''} onclick="omniCellTap('${pp}','${ds}')" title="${esc(title)}" style="position:relative;height:28px;border-radius:6px;${bgCss}border:${border};cursor:${past?'default':'pointer'};opacity:${past?.35:1};padding:0;color:${icCol};">${icon?omniIconSvg(icon):''}${pp===people[0]?film:''}</button>`; }).join('');
     });
     strip += `</div></div>`;
   }
   strip += `<button onclick="omniDiaryMoreWeeks()" style="width:100%;padding:9px;border-radius:var(--radius-sm);background:var(--surface2);color:var(--muted);border:1px solid var(--border);font-weight:700;font-size:12px;cursor:pointer;margin-bottom:14px;">Show 4 more weeks</button>`;
 
   let html=`<div class="week-header"><h2>DIARY</h2><span class="subtitle">Tap a cell to mark busy or free \u00b7 tap a date for the day</span></div>`;
+  const kb = css => `<span style="width:16px;height:12px;border-radius:3px;border:1px solid var(--border);display:inline-block;${css}"></span>`;
   html+=`<div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:12px;font-size:11px;color:var(--muted);">
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${OMNI_PCOLORS.Owen};display:inline-block;"></span>busy all day</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${OMNI_PCOLORS.Owen}66;border:1px solid ${OMNI_PCOLORS.Owen};display:inline-block;"></span>busy between times</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;background:${hatch(OMNI_PCOLORS.Owen)};border:1px solid var(--border);display:inline-block;"></span>rule</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:14px;height:10px;border-radius:3px;border:2px dashed var(--accent);display:inline-block;"></span>unsaved</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;">${kb(CELL.busyAll)}busy all day</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;">${kb(CELL.busyPart)}busy part of the day</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;">${kb(CELL.autoAll)}automatic (rule or match)</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;">${kb(CELL.autoPart)}automatic, part of the day</span>
+    <span style="display:inline-flex;align-items:center;gap:5px;">${kb('border:2px dashed var(--accent);')}unsaved</span>
     <span style="display:inline-flex;align-items:center;gap:5px;"><span class=film-mark></span>film scheduled</span>
     <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('quiz','line-ic')}quiz</span>
     <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('rl','line-ic')}rugby</span>
-    <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('fc','line-ic')}football</span></div>`;
+    <span style="display:inline-flex;align-items:center;gap:5px;color:var(--text);">${omniIconSvg('fc','line-ic')}football</span>
+    <span style="flex-basis:100%;font-size:10.5px;">Tap a free box to mark busy (all day or some hours) \u00b7 tap a busy box to change or free it \u00b7 tap a striped box to skip that rule or say you\u2019re not working the match.</span></div>`;
   html+=bar;
   html+=strip;
 
@@ -4945,6 +5070,7 @@ function omniBuildDiaryPage(){
 //  RULES — recurring availability, editable in the app (saved immediately)
 // ============================================================================
 let OMNI_RULES_OPEN = false;
+let OMNI_DATA_OPEN = false;
 function omniRulesSection(){
   const esc = omniEsc, people = OMNI_RULES.people, rules = OMNI_STATE.rules || [];
   const dn = ['Mo','Tu','We','Th','Fr','Sa','Su'], dv = [1,2,3,4,5,6,0];
@@ -5052,7 +5178,7 @@ function omniDiaryNote(idx, val){
 //  DATA TAB
 // ============================================================================
 function omniBuildDataPage(){
-  const el=document.getElementById('page-data'); if(!el) return;
+  const el=document.getElementById('page-data-inline') || document.getElementById('page-data'); if(!el) return;
   const count = OMNI_SCRAPE ? OMNI_SCRAPE.length : Object.keys(DATA.film_cache||{}).length;
   const screenTotal = OMNI_SCRAPE ? OMNI_SCRAPE.reduce((n,f)=>n+((f.showings||f.showtimes||[]).length),0) : 0;
   const src = OMNI_SCRAPE ? `uploaded log (saved to Sheet)${screenTotal?` · ${screenTotal} screenings tracked`:''}` : 'built-in snapshot';
@@ -5563,6 +5689,14 @@ function omniShowFilmCard(title){
               : 'background:var(--accent);color:var(--bg);border:none;')
       + `font-weight:800;font-size:12.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">${label}</button></div>`;
   }
+  // booked? — only meaningful for a scheduled film
+  {
+    const sched = (DATA.schedule||[]).find(f => f.title === title);
+    if (sched){
+      const b = omniIsBooked(title, sched.showing.date);
+      inner += `<div style="padding:0 18px 10px;"><button onclick="omniCardBookedToggle()" style="width:100%;padding:9px 12px;border-radius:var(--radius-sm);border:1px solid ${b?'rgba(70,227,165,.4)':'var(--border)'};background:${b?'rgba(70,227,165,.12)':'var(--surface2)'};color:${b?'var(--new)':'var(--text)'};font-weight:700;font-size:12px;cursor:pointer;">${b ? 'Booked \u2713 \u2014 tap to undo' : 'Mark as booked'}</button></div>`;
+    }
+  }
   // secondary actions: jump to its screenings; toggle the don't-watch list
   {
     const skipped = OMNI_STATE.doNotWatch.some(t => omniNormTitle(t).toLowerCase() === title.toLowerCase());
@@ -5630,6 +5764,18 @@ async function omniGenerateSummary(){
     if (btn){ btn.disabled = false; btn.textContent = 'Generate summary'; }
     omniToast('Summary failed \u2014 ' + (e && e.message ? e.message : e), 'var(--danger)');
   }
+}
+function omniIsBooked(title, date){ return (OMNI_STATE.booked||[]).some(b => b.title === title && b.date === date); }
+function omniCardBookedToggle(){
+  const c = document.querySelector('#omni-film-card [data-title]'); const title = c ? c.dataset.title : ''; if (!title) return;
+  const f = (DATA.schedule||[]).find(x => x.title === title); if (!f) return;
+  const date = f.showing.date;
+  OMNI_STATE.booked = (OMNI_STATE.booked||[]).filter(b => !(b.title === title && b.date === date));
+  const now = !omniIsBooked(title, date);
+  if (now) OMNI_STATE.booked.push({ title, date });
+  omniApply(true);
+  omniShowFilmCard(title);
+  omniToast(now ? `${title}: booked` : `${title}: not booked`, now ? 'var(--new)' : 'var(--muted)');
 }
 function omniCardLock(){
   const c = document.querySelector('#omni-film-card [data-title]');
