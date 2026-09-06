@@ -3456,7 +3456,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r53 · supabase';
+const OMNI_BUILD = 'r54 · supabase';
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -5651,6 +5651,24 @@ function omniShowFilmCard(title){
           + pp.filter(n=>det[n]).map(n => `<tr><td style="color:${OMNI_PCOLORS[n]};font-weight:700;padding:2px 4px 2px 0;">${n}</td>`
               + cats.map(c=>`<td style="text-align:center;padding:2px 3px;color:var(--text);">${typeof det[n][c]==='number'?det[n][c].toFixed(1):'\u2013'}</td>`).join('') + '</tr>').join('')
           + '</table></div>';
+      }
+      // who's likely to like it, and why — from the stored per-person reasons
+      {
+        const notes = info.prediction_notes || {};
+        const order = pp.slice().sort((a,b) => pred[b] - pred[a]);
+        const hasNotes = order.some(n => notes[n]);
+        let who = '';
+        if (order.length >= 2){
+          const top = order[0], low = order[order.length-1];
+          const gap = pred[top] - pred[low];
+          who += `<div style="font-size:12px;line-height:1.5;color:var(--text);margin-bottom:${hasNotes?'6px':'0'};">`
+            + (gap < 0.4 ? `Predicted to land about the same for all three (${order.map(n=>`${n} ${pred[n].toFixed(1)}`).join(', ')}).`
+                         : `<b style="color:${OMNI_PCOLORS[top]}">${top}</b> most likely to enjoy it (${pred[top].toFixed(1)}), <b style="color:${OMNI_PCOLORS[low]}">${low}</b> least (${pred[low].toFixed(1)}).`)
+            + `</div>`;
+        }
+        if (hasNotes) who += order.filter(n => notes[n]).map(n =>
+          `<div style="font-size:11.5px;line-height:1.45;color:var(--muted);margin-top:3px;"><b style="color:${OMNI_PCOLORS[n]}">${n}</b> \u2014 ${esc(notes[n])}</div>`).join('');
+        if (who) inner += `<div style="padding-top:2px;"><span class=ntag style="margin-bottom:5px;display:inline-block;">WHO\u2019LL LIKE IT</span>${who}</div>`;
       }
       if (crit.consensus)
         inner += `<div style="font-size:11.5px;color:var(--muted);line-height:1.45;"><span class=ntag style="margin-right:6px;">CRITICS</span>${esc(crit.consensus)}${typeof crit.score_estimate==='number'?` <span style="font-family:var(--mono);">~${crit.score_estimate}/100</span>`:''}${typeof crit.audience_estimate==='number'?` <span style="font-family:var(--mono);">audience ~${crit.audience_estimate}</span>`:''}</div>`;
