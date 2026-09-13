@@ -1397,7 +1397,7 @@ function buildWeekPage() {
           }
         }
       });
-      html += `<div style="padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);display:flex;justify-content:flex-end;"><button onclick="omniQuickUnavailable('${dateStr}')" style="font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;background:none;border:1px solid var(--border);color:var(--muted);cursor:pointer;">Not available</button></div>`;
+      html += `<div style="padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);display:flex;justify-content:flex-end;"><button onclick="omniQuickUnavailable('${dateStr}','${(films[0]&&films[0].showing.start)||''}','${(films[0]&&(films[0].showing.end||''))||''}')" style="padding:6px 12px;border-radius:8px;background:var(--surface);color:var(--text);border:1px solid var(--border);font-weight:700;font-size:11.5px;cursor:pointer;">+ Busy time</button></div>`;
       // Notes at the very bottom of the day block
       if (notes.length > 0) {
         notes.forEach(note => {
@@ -3457,7 +3457,9 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r55 · gathertime';
+const OMNI_BUILD = 'r57 · gathertime';
+const OMNI_PCOLORS = { Owen:'#9B8CFF', Conor:'#3FD9A4', Alice:'#FF7EB6', ALL:'#FF6B6B' };
+
 
 // ---- ntfy push notifications --------------------------------------------
 // Everyone installs the ntfy app (ntfy.sh) and subscribes to this topic.
@@ -3693,7 +3695,7 @@ const GT_URL = 'https://zlauszzjvhlivyskcoqt.supabase.co';
 const GT_KEY = 'sb_publishable_0_6a25hAU3KPKSOfcbZRxQ_BCgla_LQ';
 const GT_TAG_FILM    = 'omnischedule:film';      // our own events — ignored when reading
 const GT_TAG_FIXTURE = 'omnischedule:fixture';   // ours too, but DO block (that's the point)
-const GT_HORIZON_DAYS = 180;
+const GT_HORIZON_DAYS = 180;          // floor; extended to cover the furthest showing
 
 function gtConfigured(){
   return /^https:\/\/.+\.supabase\.co$/.test(String(GT_URL).replace(/\/$/,'')) && String(GT_KEY).length > 30;
@@ -3710,14 +3712,33 @@ async function gt(path, opts){
 }
 function gtArr(v){ if (Array.isArray(v)) return v;
   if (typeof v === 'string'){ try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch(e){ return []; } } return []; }
+// Wall-clock in another IANA zone -> wall-clock in Europe/London (all-day rows
+// are calendar dates and are left alone). No-op for London events.
+function gtToLondon(localStr, tz){
+  if (!tz || tz === 'Europe/London' || !localStr) return localStr;
+  try {
+    const [dp, tp] = String(localStr).split(' ');
+    const [Y,M,D] = dp.split('-').map(Number); const [hh,mm] = (tp||'00:00').split(':').map(Number);
+    let ts = Date.UTC(Y, M-1, D, hh, mm);
+    for (let i=0;i<3;i++){                                  // converge on the right instant
+      const asTz = new Date(ts).toLocaleString('sv-SE', { timeZone: tz });
+      ts -= (Date.parse(asTz.replace(' ','T')+'Z') - ts);
+    }
+    return new Date(ts).toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0,16);
+  } catch(e){ return localStr; }
+}
 function gtIso(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function gtAddDays(ds, n){ const d = parseDateStr(ds); d.setDate(d.getDate()+n); return gtIso(d); }
 
 // One calendar event -> the days (and times) it actually occupies.
 function gtExpand(ev, fromISO, toISO){
   const out=[];
-  const s=String(ev.start_local||''); if(!s) return out;
-  const e=String(ev.end_local||s);
+  const allDayEv = !!ev.all_day;
+  let s=String(ev.start_local||''); if(!s) return out;
+  let e=String(ev.end_local||s);
+  if (!allDayEv && ev.time_zone && ev.time_zone !== 'Europe/London'){
+    s = gtToLondon(s, ev.time_zone); e = gtToLondon(e, ev.time_zone);
+  }
   const sd=s.slice(0,10), st=s.slice(11,16)||'00:00';
   const ed=e.slice(0,10), et=e.slice(11,16)||'23:59';
   const allDay=!!ev.all_day;
@@ -3766,8 +3787,17 @@ function gtExpand(ev, fromISO, toISO){
     emit(cur); n++;
     if(freq==='daily') cur=gtAddDays(cur,iv);
     else if(freq==='weekly') cur=gtAddDays(cur,7*iv);
-    else if(freq==='monthly'){const d=parseDateStr(cur); d.setMonth(d.getMonth()+iv); cur=gtIso(d);}
-    else if(freq==='yearly'){const d=parseDateStr(cur); d.setFullYear(d.getFullYear()+iv); cur=gtIso(d);}
+    else if(freq==='monthly'||freq==='yearly'){
+      // skip impossible dates (31st of a short month, 29 Feb) rather than rolling over
+      const dom=Number(sd.slice(8,10)); let y=Number(cur.slice(0,4)), mo=Number(cur.slice(5,7));
+      let guardN=0;
+      while(guardN++ < 60){
+        if(freq==='monthly'){ mo+=iv; while(mo>12){mo-=12;y++;} } else y+=iv;
+        const dim=new Date(y, mo, 0).getDate();
+        if(dom<=dim){ cur=`${y}-${String(mo).padStart(2,'0')}-${String(dom).padStart(2,'0')}`; break; }
+      }
+      if(guardN>=60) break;
+    }
     else break;
   }
   return out;
@@ -3779,15 +3809,39 @@ let GT_BUSY = {};            // person -> [{date, allDay, from, to, title}]
 let GT_STATUS = { ok:false, events:0, note:'' };
 let GT_FILM_IDS = [];        // ids of the film events currently in the calendar
 
+// The calendar must be expanded at least as far as the last showing we might pick.
+function gtHorizonEnd(){
+  let max = gtAddDays(omniToday(), GT_HORIZON_DAYS);
+  const bump = d => { if (d && d > max) max = d; };
+  try { (OMNI_SCRAPE || []).forEach(f => (f.showings||[]).forEach(s => bump(s.date))); } catch(e){}
+  try { Object.values((DATA && DATA.film_cache) || {}).forEach(f => (f.showings||[]).forEach(s => bump(s.date))); } catch(e){}
+  try { (OMNI_STATE.committed||[]).forEach(c => bump((c.showing||{}).date)); } catch(e){}
+  return gtAddDays(max, 7);
+}
 async function gtLoad(){
   GT_BUSY = {}; OMNI_RULES.people.forEach(p => GT_BUSY[p] = []);
   if (!gtConfigured()){ GT_STATUS = { ok:false, events:0, note:'calendar not configured' }; return GT_STATUS; }
   try {
-    const profs = await gt('gathertime_profiles?select=id,name');
+    let profs = null, evs = null;
+    try {                                            // one complete snapshot — no row-limit truncation
+      const snap = await gt('rpc/gathertime_snapshot');
+      if (snap && Array.isArray(snap.profiles) && Array.isArray(snap.events)){ profs = snap.profiles; evs = snap.events; }
+    } catch(e){}
+    if (!profs){                                     // fallback: paginate the plain selects
+      profs = await gt('gathertime_profiles?select=id,name&order=id.asc');
+      evs = []; let off = 0;
+      for (let page=0; page<40; page++){
+        const chunk = await gt(`gathertime_events?select=*&order=id.asc&limit=500&offset=${off}`);
+        if (!chunk || !chunk.length) break;
+        evs = evs.concat(chunk); off += chunk.length;
+        if (chunk.length < 500) break;
+      }
+    }
     GT_PROFILES = {}; GT_PROFILE_NAME = {};
     (profs||[]).forEach(p => { GT_PROFILES[p.name] = p.id; GT_PROFILE_NAME[p.id] = p.name; });
-    const from = gtAddDays(omniToday(), -1), to = gtAddDays(omniToday(), GT_HORIZON_DAYS);
-    const evs = await gt('gathertime_events?select=*');
+    const missing = OMNI_RULES.people.filter(n => !GT_PROFILES[n]);
+    if (missing.length) throw new Error('no calendar profile for ' + missing.join(', ') + ' — their availability is unknown');
+    const from = gtAddDays(omniToday(), -1), to = gtHorizonEnd();
     let used = 0;
     GT_FILM_IDS = (evs||[]).filter(e => String(e.notes||'').indexOf(GT_TAG_FILM) === 0).map(e => e.id).sort();
     (evs||[]).forEach(ev => {
@@ -3801,7 +3855,7 @@ async function gtLoad(){
       if (occ.length) used++;
       owners.forEach(n => { occ.forEach(o => GT_BUSY[n].push(o)); });
     });
-    GT_STATUS = { ok:true, events:used, note:'' };
+    GT_STATUS = { ok:true, events:used, note:'', horizon:to };
   } catch(e){
     GT_STATUS = { ok:false, events:0, note: (e && e.message) ? String(e.message).slice(0,120) : 'unreachable' };
   }
@@ -3817,17 +3871,33 @@ function gtUuid(seed){
   return `${a}-${b.slice(0,4)}-5${b.slice(5,8)}-a${c.slice(1,4)}-${c.slice(4)}${d}`;
 }
 function gtEvent(seed, ids, title, date, from, to, allDay, tag, location){
-  return { id: gtUuid(seed), profile_id: ids[0], participant_ids: ids.slice(1), title,
+  return { id: gtUuid(seed), profile_id: ids[0],
+    participant_ids: ids.slice(1).filter(x => x && x !== ids[0]),
+    title: String(title||'').slice(0,160),
     start_local: date+' '+(allDay?'00:00':from)+':00',
     end_local: allDay ? gtAddDays(date,1)+' 00:00:00' : date+' '+to+':00',
-    time_zone:'Europe/London', all_day:!!allDay, busy:true, location: location||'',
-    notes: tag, recurrence_freq:'none', repeat_interval:1, repeat_weekdays:[], excluded_dates:[] };
+    time_zone:'Europe/London', all_day:!!allDay, busy:true, location: String(location||'').slice(0,500),
+    notes: tag, recurrence_freq:'none', repeat_interval:1, repeat_weekdays:[],
+    repeat_until:null, repeat_count:null, excluded_dates:[] };
 }
-async function gtReplace(tag, rows){
+// Publish without ever leaving a gap: upsert everything wanted in small batches,
+// and only once every write has succeeded remove the rows that are now obsolete.
+const GT_BATCH = 5;                      // their import timed out at 33, fine at 3
+async function gtPublish(tag, rows){
   if (!gtConfigured()) return;
-  await gt('gathertime_events?notes=eq.' + encodeURIComponent(tag), { method:'DELETE' });
-  for (let i=0;i<rows.length;i+=40)
-    await gt('gathertime_events', { method:'POST', headers:{ 'Prefer':'return=minimal' }, body: JSON.stringify(rows.slice(i,i+40)) });
+  const existing = (await gt('gathertime_events?notes=eq.' + encodeURIComponent(tag) + '&select=id')) || [];
+  for (let i=0;i<rows.length;i+=GT_BATCH){
+    await gt('gathertime_events?on_conflict=id', {
+      method:'POST', headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows.slice(i, i+GT_BATCH)) });
+  }
+  const want = new Set(rows.map(r => r.id));
+  const dead = existing.map(e => e.id).filter(id => !want.has(id));
+  for (let i=0;i<dead.length;i+=20){                       // scoped by marker AND id
+    const ids = dead.slice(i, i+20).map(encodeURIComponent).join(',');
+    await gt(`gathertime_events?notes=eq.${encodeURIComponent(tag)}&id=in.(${ids})`, { method:'DELETE' });
+  }
+  return { upserted: rows.length, removed: dead.length };
 }
 // our scheduled films -> the calendar (tagged so we ignore them when reading back)
 function gtFilmRowIds(){
@@ -3841,7 +3911,7 @@ async function gtSyncFilmsIfStale(){
   GT_FILM_IDS = gtFilmRowIds();
 }
 async function gtPushFilms(){
-  if (!gtConfigured()) return;
+  if (!gtConfigured() || !GT_STATUS.ok) return;   // never publish off an incomplete read
   const rows = (DATA.schedule||[]).map(f => {
     const s = f.showing;
     const ids = (s.attendees && s.attendees.length ? s.attendees : OMNI_RULES.people)
@@ -3850,7 +3920,7 @@ async function gtPushFilms(){
     return gtEvent(GT_TAG_FILM+'|'+f.title+'|'+s.date+'|'+s.start, ids,
       'Cinema: '+f.title, s.date, s.start, s.end || omniDefaultEnd(s.start), false, GT_TAG_FILM, 'Omniplex Wigan');
   }).filter(Boolean);
-  try { await gtReplace(GT_TAG_FILM, rows); } catch(e){ omniToast('Couldn\u2019t update the calendar with our films','var(--danger)'); }
+  try { await gtPublish(GT_TAG_FILM, rows); } catch(e){ omniToast('Couldn\u2019t update the calendar with our films','var(--danger)'); }
 }
 // Wigan home games -> the calendar, against whoever they block
 async function gtPushFixtures(){
@@ -3865,7 +3935,7 @@ async function gtPushFixtures(){
       return String(Math.min(23,Math.floor(t/60))).padStart(2,'0')+':'+String(t%60).padStart(2,'0'); })() : '';
     return gtEvent(GT_TAG_FIXTURE+'|'+f.date+'|'+title, ids, title, f.date, f.time||'', to, !timed, GT_TAG_FIXTURE, f.venue||'');
   }).filter(Boolean);
-  try { await gtReplace(GT_TAG_FIXTURE, rows); omniToast(rows.length+' fixtures pushed to the calendar','var(--new)'); }
+  try { await gtPublish(GT_TAG_FIXTURE, rows); omniToast(rows.length+' fixtures pushed to the calendar','var(--new)'); }
   catch(e){ omniToast('Couldn\u2019t push fixtures to the calendar','var(--danger)'); }
 }
 
@@ -4073,7 +4143,12 @@ function omniBuildData(){
   // predicted to rate highest goes first; ties (and films with no prediction,
   // which count as a middling 3.0) fall back to fewest-options-first.
   const prio = f => { const r = omniPredictedAvg(f.title); return r === null ? 3.0 : r; };
-  const toPlace = needsRepick.concat(fresh).sort((a,b)=> (prio(b) - prio(a)) || (a.watchable_count - b.watchable_count));
+  // If the shared calendar didn't load, we don't know who's free — keep what's
+  // already committed and place nothing new rather than booking into a conflict.
+  const calendarOk = !gtConfigured() || GT_STATUS.ok;
+  const toPlace = calendarOk
+    ? needsRepick.concat(fresh).sort((a,b)=> (prio(b) - prio(a)) || (a.watchable_count - b.watchable_count))
+    : [];
   for (const f of toPlace){
     const s = omniPickBest(f.showings, taken);
     if (s){ decided[f.title] = { showing:s, locked:false }; taken.push(s);
@@ -4086,7 +4161,7 @@ function omniBuildData(){
   //    b) if two films share a day but one of them has any other empty
   //       schedulable day, spread them out (one film per day unless necessary).
   //    Locked films never move.
-  {
+  if (calendarOk) {
     const dayCount = {};
     Object.values(decided).forEach(d => { dayCount[d.showing.date] = (dayCount[d.showing.date]||0)+1; });
     const rank = (a,b) =>
@@ -4759,88 +4834,74 @@ function omniToast(msg, color){
 // ============================================================================
 //  QUICK "I'M UNAVAILABLE" — from a scheduled day on the Calendar
 // ============================================================================
-function omniQuickUnavailable(dateStr){
+// ============================================================================
+//  ADD BUSY TIME — writes straight into the shared calendar (GatherTime).
+//  Prefilled with the film's own times, since the usual reason for opening this
+//  is "I can't make that showing".
+// ============================================================================
+function omniQuickUnavailable(dateStr, prefFrom, prefTo, prefTitle){
   omniCloseUnavail();
-  const existingNote=(OMNI_STATE.diary.find(d=>d.date===dateStr && d.reason && d.reason!=='Marked unavailable' && d.reason!=='Not available')||{}).reason||'';
+  if (!gtConfigured()){ omniToast('The shared calendar isn\u2019t configured','var(--danger)'); return; }
+  const esc=omniEsc;
+  const film=(DATA.schedule||[]).find(f=>f.showing.date===dateStr);
+  const from=prefFrom || (film?film.showing.start:'19:00');
+  const to  =prefTo   || (film?(film.showing.end||omniDefaultEnd(from)):'23:00');
+  const inp='padding:8px;border-radius:7px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-size:12.5px;';
   const modal=document.createElement('div'); modal.id='omni-unavail-modal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:16px;';
-  const btns=OMNI_RULES.people.map(p=>{
-    const off=OMNI_STATE.diary.some(d=>d.date===dateStr && d.person===p);
-    return `<button onclick="omniToggleUnavail('${dateStr}','${p}')" style="flex:1;min-width:90px;padding:14px 10px;border-radius:10px;background:${off?'rgba(248,113,113,.18)':'var(--surface2)'};border:1px solid ${off?'var(--danger)':'var(--border)'};color:var(--text);font-weight:700;cursor:pointer;">
-      <span class="attendee-chip ${chipClass(p)}" style="pointer-events:none;">${p}</span>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px;">${off?"can't make it ✓":'tap if not free'}</div></button>`;
-  }).join('');
-  modal.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;max-width:420px;width:100%;padding:18px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="font-family:'Archivo',sans-serif;font-size:20px;letter-spacing:1px;color:var(--accent);">WHO'S NOT FREE?</div>
-      <button onclick="omniCloseUnavail()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;">&times;</button></div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">${formatFullDate(dateStr)} — tap a name to mark them unavailable (tap again to undo). The film moves to a day they can make it.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">${btns}</div>
-    <div style="margin-top:14px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Note (optional — why?)</div>
-      <div style="display:flex;gap:6px;">
-        <input type="text" id="omni-unavail-note" value="${(existingNote||'').replace(/"/g,'&quot;')}" placeholder="e.g. away for the weekend" style="flex:1;padding:8px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);">
-        <button onclick="omniUnavailNote('${dateStr}')" style="padding:8px 12px;border-radius:8px;background:var(--surface2);color:var(--text);border:1px solid var(--border);cursor:pointer;white-space:nowrap;">Save note</button>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px;">The note shows on that day in the calendar, like the quiz/match notes.</div>
-    </div>
-    <button onclick="omniCloseUnavail()" style="margin-top:14px;width:100%;padding:10px;border-radius:8px;background:var(--accent);color:var(--bg);border:none;font-weight:700;cursor:pointer;">Done</button></div>`;
+  modal.style.cssText='position:fixed;inset:0;background:rgba(5,7,13,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:18px;';
   modal.addEventListener('click',e=>{ if(e.target===modal) omniCloseUnavail(); });
+  modal.innerHTML=`<div style="width:100%;max-width:390px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow-2);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+      <div style="font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:.3px;">Add busy time</div>
+      <button onclick="omniCloseUnavail()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">\u00d7</button></div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px;">${esc(formatFullDate(dateStr))} \u00b7 goes straight into the shared calendar, so everyone sees it.</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Who</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      ${OMNI_RULES.people.map(pp=>`<label style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px;cursor:pointer;"><input type="checkbox" class="qu-who" value="${pp}">${pp}</label>`).join('')}</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button id="qu-all" onclick="omniQuMode('all')" style="flex:1;${inp}font-weight:800;">All day</button>
+      <button id="qu-times" onclick="omniQuMode('times')" style="flex:1;${inp}font-weight:800;background:var(--accent);color:var(--bg);border-color:var(--accent);">Between times</button></div>
+    <div id="qu-times-row" data-mode="times" style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+      <input type="time" id="qu-from" value="${esc(from)}" style="${inp}"><span style="font-size:11px;color:var(--muted);">to</span><input type="time" id="qu-to" value="${esc(to)}" style="${inp}"></div>
+    <input type="text" id="qu-title" value="${esc(prefTitle||'')}" placeholder="what is it? (work, gig, away\u2026)" style="width:100%;${inp}margin-bottom:12px;">
+    <div style="display:flex;gap:8px;">
+      <button onclick="omniCloseUnavail()" style="flex:1;${inp}color:var(--muted);">Cancel</button>
+      <button id="qu-go" onclick="omniQuSubmit('${dateStr}')" style="flex:2;${inp}font-weight:800;background:var(--accent);color:var(--bg);border-color:var(--accent);">Add to calendar</button></div></div>`;
   document.body.appendChild(modal);
 }
 function omniCloseUnavail(){ const m=document.getElementById('omni-unavail-modal'); if(m) m.remove(); }
-function omniToggleUnavail(dateStr, person){
-  const noteEl=document.getElementById('omni-unavail-note');
-  const note=noteEl ? noteEl.value.trim() : '';
-  const i=OMNI_STATE.diary.findIndex(d=>d.date===dateStr && d.person===person);
-  if (i>=0) OMNI_STATE.diary.splice(i,1);
-  else OMNI_STATE.diary.push({date:dateStr, person, reason: note || 'Marked unavailable'});
-  // Mirror into any staged diary draft rather than throwing the draft away.
-  if (OMNI_DIARY_PENDING){
-    if (omniDiaryDirty()){
-      const j=OMNI_DIARY_PENDING.findIndex(d=>d.date===dateStr && d.person===person);
-      if (i>=0 && j>=0) OMNI_DIARY_PENDING.splice(j,1);
-      else if (i<0 && j<0) OMNI_DIARY_PENDING.push({date:dateStr, person, reason: note || 'Marked unavailable'});
-    } else OMNI_DIARY_PENDING=null;   // clean draft — just resync from saved
+function omniQuMode(mode){
+  const all=document.getElementById('qu-all'), tm=document.getElementById('qu-times'), row=document.getElementById('qu-times-row');
+  const on='background:var(--accent);color:var(--bg);border-color:var(--accent);', off='background:var(--surface2);color:var(--text);border-color:var(--border);';
+  all.style.cssText+=mode==='all'?on:off; tm.style.cssText+=mode==='times'?on:off;
+  row.style.display=mode==='times'?'flex':'none'; row.dataset.mode=mode;
+}
+async function omniQuSubmit(dateStr){
+  const who=[...document.querySelectorAll('.qu-who:checked')].map(e=>e.value);
+  if(!who.length){ omniToast('Pick who it\u2019s for','var(--danger)'); return; }
+  const row=document.getElementById('qu-times-row'), timed=row.dataset.mode==='times';
+  const from=timed?document.getElementById('qu-from').value:'', to=timed?document.getElementById('qu-to').value:'';
+  if(timed && (!from||!to||to<=from)){ omniToast('Give a start and a later end time','var(--danger)'); return; }
+  const title=(document.getElementById('qu-title').value||'').trim() || 'Busy';
+  const ids=who.map(n=>GT_PROFILES[n]).filter(Boolean);
+  if(!ids.length){ omniToast('No calendar profile for those people','var(--danger)'); return; }
+  const btn=document.getElementById('qu-go'); if(btn){ btn.disabled=true; btn.textContent='Adding\u2026'; }
+  const ev=gtEvent('manual|'+dateStr+'|'+title+'|'+who.join(',')+'|'+from, ids, title, dateStr, from, to, !timed, '', '');
+  ev.notes='';                                   // a normal calendar entry, not one of ours
+  try{
+    if(typeof omniSaveBegin==='function') omniSaveBegin();
+    await gt('gathertime_events?on_conflict=id', { method:'POST',
+      headers:{ 'Prefer':'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([ev]) });
+    omniCloseUnavail();
+    await gtLoad();                              // pull it back so the schedule reacts
+    omniApply(true);
+    if(typeof omniSaveEnd==='function') omniSaveEnd();
+    omniToast(`${who.join(' & ')} busy ${timed?from+'\u2013'+to:'all day'} \u2014 added to the calendar`,'var(--new)');
+  }catch(e){
+    if(typeof omniSaveEnd==='function') omniSaveEnd();
+    if(btn){ btn.disabled=false; btn.textContent='Add to calendar'; }
+    omniToast('Couldn\u2019t add it: '+((e&&e.message)?String(e.message).slice(0,80):'failed'),'var(--danger)');
   }
-  omniApply(true); omniQuickUnavailable(dateStr);
-}
-function omniUnavailNote(dateStr){
-  const note=(document.getElementById('omni-unavail-note').value||'').trim();
-  const affected=OMNI_STATE.diary.filter(d=>d.date===dateStr);
-  if(!affected.length){ omniToast('Mark someone unavailable first','var(--danger)'); return; }
-  affected.forEach(d=>{ d.reason = note || 'Marked unavailable'; });
-  if (OMNI_DIARY_PENDING){
-    if (omniDiaryDirty()) OMNI_DIARY_PENDING.filter(d=>d.date===dateStr)
-      .forEach(d=>{ d.reason = note || 'Marked unavailable'; });
-    else OMNI_DIARY_PENDING=null;
-  }
-  omniApply(true); omniQuickUnavailable(dateStr);
-  omniToast(note?'Note saved ✓':'Note cleared','var(--new)');
-}
-
-// ============================================================================
-//  DIARY TAB — calendar interface
-// ============================================================================
-let OMNI_DIARY_VIEW = { y:null, m:null, person:'Owen' };
-let OMNI_DIARY_PENDING = null;   // working copy; committed only on Save
-const OMNI_PCOLORS = { Owen:'#9B8CFF', Conor:'#3FD9A4', Alice:'#FF7EB6', ALL:'#FF6B6B' };
-const omniCloneDiary = a => a.map(o => Object.assign({}, o));
-function omniDiaryKey(o){ return o.person+'|'+o.date+'|'+(o.reason||'')+'|'+(o.from||'')+'-'+(o.to||''); }
-function omniDiaryDirty(){ return false; }   // availability is read-only here now
-function omniDiaryChangeCount(){
-  if(!OMNI_DIARY_PENDING) return 0;
-  const key=o=>o.person+'|'+o.date;
-  const S=new Set(OMNI_STATE.diary.map(key)), P=new Set(OMNI_DIARY_PENDING.map(key));
-  let n=0; P.forEach(k=>{ if(!S.has(k)) n++; }); S.forEach(k=>{ if(!P.has(k)) n++; }); return n;
-}
-
-function omniStructuralOff(dateStr){
-  const out=[];
-  OMNI_RULES.people.forEach(p => (GT_BUSY[p]||[]).forEach(b => {
-    if (b.date === dateStr) out.push({person:p, reason:b.title||'Busy', allDay:b.allDay, from:b.from, to:b.to});
-  }));
-  return out;
 }
 function omniDiaryPerson(p){ OMNI_DIARY_VIEW.person=p; omniBuildDiaryPage(); }
 function omniDiaryNav(delta){ let m=OMNI_DIARY_VIEW.m+delta, y=OMNI_DIARY_VIEW.y;
