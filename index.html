@@ -1187,86 +1187,24 @@ function buildWeekPage() {
     activeCdId = 'cd_' + activeShowing.showing.date + '_' + activeShowing.showing.start.replace(':','');
   }
 
-  const HOME_GAME_DATES = new Set([
-    // Warriors (RL)
-    '2026-02-21','2026-02-26','2026-03-13','2026-03-19','2026-03-28',
-    '2026-04-19','2026-05-02','2026-05-15',
-    '2026-07-10','2026-07-24','2026-08-08','2026-08-21','2026-08-27','2026-09-11',
-    // Athletic (FC) — confirmed home games only
-    '2025-08-02','2025-08-12','2025-08-16','2025-08-26','2025-08-30',
-    '2025-09-13','2025-09-23','2025-09-27','2025-10-11','2025-10-18',
-    '2025-11-01','2025-11-29','2025-12-02','2025-12-06','2025-12-20',
-    '2026-01-01','2026-01-17','2026-01-31','2026-02-10','2026-02-21',
-    '2026-02-28','2026-03-14','2026-03-21','2026-04-11','2026-04-18',
-  ]);
-
-  const BANK_HOLIDAYS_RELAXED = new Set(['2026-05-25']);
-
-  const dayNotes = {
-    '2026-05-07': ['<span class=ntag>GIG</span>Baby No Money gig — Conor & Alice unavailable'],
-    '2026-05-09': ['<span class=ntag>GIG</span>Mr Gey Gig — Conor & Alice unavailable'],
-    '2026-05-10': ['<span class=ntag>NONE</span>Everyone unavailable'],
-    '2026-05-11': ['<span class=ntag>GIG</span>Maisie Peters gig — Conor & Alice unavailable'],
-    '2026-05-12': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
-    '2026-05-13': ['<span class=ntag>NONE</span>No films today'],
-    '2026-05-14': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
-    '2026-05-15': ['<span class=ntag>MATCH</span>Warriors vs Leeds Rhinos (home — no cinema)', '<span class=ntag>DRINKS</span>Owen at work drinks'],
-    '2026-05-16': ['<span class=ntag>EVENT</span>Eurovision — everyone unavailable'],
-    '2026-05-18': ['<span class=ntag>EVENT</span>Tennis — everyone unavailable'],
-    '2026-05-19': ['<span class=ntag>OFF</span>Owen unavailable (seeing Sam)'],
-    '2026-05-21': ['<span class=ntag>TRAVEL</span>Owen in London'],
-    '2026-05-25': ["<span class=ntag>HOLIDAY</span>Bank holiday — Owen's normal time constraints relaxed"],
-    '2026-05-27': ['<span class=ntag>TRAVEL</span>Alice in London'],
-    '2026-05-29': ['<span class=ntag>GIG</span>Gig — Conor & Alice unavailable'],
-    '2026-06-13': ['<span class=ntag>GIG</span>Clog Men gig — everyone unavailable'],
-    '2026-06-19': ['<span class=ntag>WORK</span>By-election day after — Owen unavailable'],
-    '2026-06-20': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-21': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-22': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-23': ['<span class=ntag>TRIP</span>Nottingham Escape Trip — everyone unavailable'],
-    '2026-06-28': ['<span class=ntag>SHOW</span>Dark Room Man — everyone unavailable'],
-    '2026-06-29': ['<span class=ntag>FILM</span>Supergirl with Lucy (locked)'],
-    '2026-07-21': ['<span class=ntag>OFF</span>Conor unavailable'],
-    '2026-08-26': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-08-27': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-08-28': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-08-29': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-08-30': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-08-31': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-    '2026-09-01': ['<span class=ntag>TRIP</span>Wales trip — everyone unavailable'],
-  };
-
+  // Day notes come from the shared calendar only — who's busy, what it is, when.
+  // Identical entries for several people collapse into one line.
   function getDayNotes(dateStr, dayName) {
-    const notes = [...(dayNotes[dateStr] || [])];
-    if (HOME_GAME_DATES.has(dateStr) && !notes.some(n => n.includes('no cinema'))) {
-      notes.unshift('<span class=ntag>MATCH</span>Home match day — no cinema (Conor working)');
-    }
-    const isBankHoliday = BANK_HOLIDAYS_RELAXED.has(dateStr);
-    // recurring rules, grouped by rule so "Owen, Conor: Pub quiz" reads as one line
+    const notes = [];
     try {
       const seen = new Map();
-      OMNI_RULES.people.forEach(p => omniRuleBlocks(p, dateStr).forEach(b => {
-        const k = b.rule.id || b.reason; if (!seen.has(k)) seen.set(k, { b, people:[] }); seen.get(k).people.push(p); }));
-      seen.forEach(({b, people}) => {
-        const when = b.allDay ? '' : (b.from==='00:00' ? ` until ${b.to}` : (b.to==='24:00' ? ` from ${b.from}` : ` ${b.from}–${b.to}`));
-        notes.push(`${people.join(', ')}: ${b.reason}${when}`);
-      });
+      OMNI_RULES.people.forEach(p => (GT_BUSY[p] || []).forEach(b => {
+        if (b.date !== dateStr) return;
+        const when = b.allDay ? 'all day' : `${b.from}\u2013${b.to}`;
+        const key = (b.title || 'Busy') + '|' + when;
+        if (!seen.has(key)) seen.set(key, { title: b.title || 'Busy', when, people: [] });
+        if (!seen.get(key).people.includes(p)) seen.get(key).people.push(p);
+      }));
+      [...seen.values()]
+        .sort((x, y) => (x.when === 'all day' ? '' : x.when).localeCompare(y.when === 'all day' ? '' : y.when))
+        .forEach(e => notes.push(
+          `<span class=ntag>BUSY</span>${omniEsc(e.people.join(', '))} \u2014 ${omniEsc(e.title)} \u00b7 ${omniEsc(e.when)}`));
     } catch(e){}
-    if (typeof omniMatchDay === 'function'){
-      const mf = omniMatchDay(dateStr, 'Conor');
-      if (mf){
-        const n = omniMatchDayLabel(mf) + ' — Conor working';
-        if (!notes.some(x => x.indexOf('at home') !== -1)) notes.push(n);
-      }
-    }
-    if (typeof OMNI_STATE !== 'undefined' && OMNI_STATE.diary){
-      OMNI_STATE.diary.filter(e => e.date === dateStr).forEach(e => {
-        const who = e.person === 'ALL' ? 'Everyone' : e.person;
-        const generic = !e.reason || e.reason === 'Not available' || e.reason === 'Marked unavailable';
-        const note = `<span class=ntag>OFF</span>${who} unavailable${generic ? '' : ' — ' + e.reason}`;
-        if (!notes.includes(note)) notes.push(note);
-      });
-    }
     return notes;
   }
 
@@ -3457,7 +3395,7 @@ function filterFixtures(sport) {
 //  page renders the saved schedule — it does NOT re-generate from scratch.
 // ============================================================================
 
-const OMNI_BUILD = 'r57 · gathertime';
+const OMNI_BUILD = 'r58 · gathertime';
 const OMNI_PCOLORS = { Owen:'#9B8CFF', Conor:'#3FD9A4', Alice:'#FF7EB6', ALL:'#FF6B6B' };
 
 
